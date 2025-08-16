@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Exploring Tonality Diamonds</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="viewport">
+    <!-- Floating menu (top-left) -->
+    <div id="menu" aria-label="Controls">
+      <div class="title">
+        <h1 class="name">Tonality Diamond</h1>
+        <button id="menuToggle" class="toggle" aria-expanded="true" title="Collapse (M)">⟨⟨</button>
+      </div>
+      <div id="menuContent">
+        <div class="row">
+          <fieldset>
+            <legend>Zoom</legend>
+            <div class="inline">
+              <button id="zoomOut" class="btn ghost" title="Zoom out">−</button>
+              <button id="zoomIn" class="btn ghost" title="Zoom in">+</button>
+              <button id="fit" class="btn secondary" title="Fit to screen">Fit</button>
+              <span id="zoomPct" class="muted" style="min-width:56px; text-align:right;">100%</span>
+            </div>
+            <div class="muted" style="margin-top:4px;">Pinch (touch/pen) or Ctrl+Scroll to zoom</div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Orientation</legend>
+            <div class="inline" role="radiogroup" aria-label="Unison orientation">
+              <label class="inline"><input type="radio" name="orient" id="o-h" value="h" checked> Horizontal</label>
+              <label class="inline"><input type="radio" name="orient" id="o-v" value="v"> Vertical</label>
+            </div>
+            <div class="muted">Flip the unison axis left↔right vs up↕down. (Shortcut: O)</div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Diamond</legend>
+            <div class="controls">
+              <label class="inline"><input type="radio" name="mode" id="m-limit" value="limit" checked> Limit</label>
+              <label class="inline"><input type="radio" name="mode" id="m-custom" value="custom"> Custom</label>
+              <div id="limit-opts">
+                <label>Odd limit</label>
+                <input type="number" id="oddLimit" min="1" step="2" value="5">
+                <label style="margin-top:6px;">Prime limit (≤ P, optional)</label>
+                <input type="number" id="primeLimit" min="2" step="1" placeholder="optional">
+              </div>
+              <div id="custom-opts" class="hidden">
+                <label>Numbers (period-separated, any order)</label>
+                <input type="text" id="customNums" value="4.5.6.7.9.11">
+              </div>
+              <div class="inline"><button id="presetRef" class="btn secondary">Ref preset</button><button id="build" class="btn">Build</button></div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Labels</legend>
+            <div class="inline" role="radiogroup" aria-label="Label mode">
+              <label class="inline"><input type="radio" name="labels" id="lbl-rows" value="rows" checked> Rows (a/b)</label>
+              <label class="inline"><input type="radio" name="labels" id="lbl-norm" value="norm"> Normalized [1/1..2/1]</label>
+            </div>
+            <div class="muted">Normalized mode octave-reduces each ratio so 1 ≤ ratio &lt; 2; unisons show as 1/1.</div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Audio</legend>
+            <div class="controls">
+              <div><label>1/1 (Hz)</label><input type="number" id="refHz" min="20" max="2000" step="1" value="392" style="width:110px;"></div>
+              <div><label>Wave</label><select id="wave" style="width:130px;"><option value="sine">sine</option><option value="triangle" selected>triangle</option><option value="square">square</option><option value="sawtooth">sawtooth</option></select></div>
+              <div><label>Attack / Release (ms)</label><div class="inline"><input id="attack" type="number" value="5" min="0" step="1" style="width:80px;"><span class="muted">/</span><input id="release" type="number" value="250" min="10" step="10" style="width:90px;"></div></div>
+              
+              <button id="panic" class="btn danger" style="margin-top:6px;">Panic (stop all)</button>
+            </div>
+          </fieldset>
+        </div>
+      </div>
+    </div>
+
+    <!-- center diamond -->
+    <div id="diamondWrap"><div id="stage" class="stage"></div></div>
+
+    <!-- audio banner (hidden by default) -->
+    <div id="audioBanner" class="hidden" role="status" aria-live="polite">
+      <span class="msg" id="audioBannerMsg">Audio disabled — tap anywhere or click Enable.</span>
+      <button id="enableAudio" class="btn small">Enable</button>
+    </div>
+  </div>
+<script src="js/index.js"></script>
+</body>
+</html>
