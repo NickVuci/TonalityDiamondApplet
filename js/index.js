@@ -15,6 +15,16 @@
   const hue=(n)=> (n*137+61)%360; const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; const soften=(c)=>{ const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); if(!m) return c; const h=+m[1], s=+m[2], l=+m[3]; return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; };
   const clamp=(x,a,b)=> Math.min(b, Math.max(a,x));
 
+    // Attach build triggers to relevant inputs
+    function attachBuildTriggers() {
+      ['oddLimit', 'primeLimit', 'customNums'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') build(); });
+        el.addEventListener('blur', build);
+      });
+    }
+    attachBuildTriggers();
   // --- Prime-base color mapping: prime gets full saturation, composites desaturate progressively ---
   function largestPrimeFactor(n){
     n = Math.abs(n|0);
@@ -311,10 +321,28 @@
     computePrimeHueMap(currentNums);
     render(currentNums);
   }
+    const panels = {
+        limit: document.getElementById('limit-opts'),
+        custom: document.getElementById('custom-opts')
+    };
 
-  document.getElementById('build').addEventListener('click', build);
-  document.getElementById('presetRef').addEventListener('click', ()=>{ document.getElementById('m-limit').checked=true; document.getElementById('oddLimit').value=83; document.getElementById('primeLimit').value=''; build(); });
-  const panels={ limit:document.getElementById('limit-opts'), custom:document.getElementById('custom-opts') };
+    function updatePanelVisibility() {
+        const m = mode();
+        for (const k in panels) {
+            panels[k].classList.toggle('hidden', k !== m);
+        }
+    }
+
+    // Attach listeners for mode change
+    document.querySelectorAll('input[name="mode"]').forEach(r =>
+        r.addEventListener('change', () => {
+            updatePanelVisibility();
+            build();
+        })
+    );
+
+    // Ensure correct panel is visible on page load
+    updatePanelVisibility();
   document.querySelectorAll('input[name="mode"]').forEach(r=> r.addEventListener('change', ()=>{ const m=mode(); for(const k in panels){ panels[k].classList.toggle('hidden', k!==m); } }));
 
   // Re-render labels only when label mode changes
@@ -328,6 +356,16 @@
   menuToggle.addEventListener('click', ()=> setMenuCollapsed(!menu.classList.contains('collapsed')));
   window.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='m'){ setMenuCollapsed(!menu.classList.contains('collapsed')); } });
   try{ const saved = localStorage.getItem(MENU_KEY); if(saved==='1') setMenuCollapsed(true); }catch{}
+  const instructions = document.getElementById('instructions');
+    const instructionsToggle = document.getElementById('instructionsToggle');
+    function setInstructionsCollapsed(collapsed) {
+    instructions.classList.toggle('collapsed', collapsed);
+    instructionsToggle.setAttribute('aria-expanded', !collapsed);
+    }
+    instructionsToggle.addEventListener('click', () => {
+    setInstructionsCollapsed(!instructions.classList.contains('collapsed'));
+    });
+
 
   // ---------- Optional: lightweight self-tests (opt-in) ----------
   function runSelfTests(){

@@ -51,7 +51,6 @@
                 <label>Numbers (period-separated, any order)</label>
                 <input type="text" id="customNums" value="4.5.6.7.9.11">
               </div>
-              <div class="inline"><button id="presetRef" class="btn secondary">Ref preset</button><button id="build" class="btn">Build</button></div>
             </div>
           </fieldset>
 
@@ -85,6 +84,22 @@
     <div id="audioBanner" class="hidden" role="status" aria-live="polite">
       <span class="msg" id="audioBannerMsg">Audio disabled — tap anywhere or click Enable.</span>
       <button id="enableAudio" class="btn small">Enable</button>
+    </div>
+    <div id="instructions" aria-label="Instructions" style="position:absolute; top:14px; right:14px; z-index:50;">
+      <div class="title">
+        <h2 class="name">Instructions</h2>
+        <button id="instructionsToggle" class="toggle" aria-expanded="true" title="Collapse Instructions">⟨⟨</button>
+      </div>
+      <div id="instructionsContent">
+        <!-- Your instructions go here -->
+        <ul>
+          <li>Enter values to generate the lattice.</li>
+          <li>Use zoom controls to adjust view.</li>
+          <li>Change orientation and labels as needed.</li>
+          <li>Audio controls are below for playback.</li>
+          <!-- Add more as needed -->
+        </ul>
+      </div>
     </div>
   </div>
 <script src="js/index.js"></script>
