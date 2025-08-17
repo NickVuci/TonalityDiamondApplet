@@ -60,7 +60,14 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
 .tile:not(.axis) .cell::before{ content: ""; position:absolute; inset:-25%; background: linear-gradient(to bottom, var(--numColor, #cbd5e1) 0 50%, var(--denColor, #cbd5e1) 50% 100%); transform: scale(1.45); transform-origin: 50% 50%; z-index:0; }
 
 .tile.axis{ background:#fff; cursor:pointer; }
-.tile.axis .label{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size: 12px; }
+.tile.axis .label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--cell) * 0.38); /* was 12px, now scales with zoom */
+}
 .tile:focus, .tile.axis:focus{ outline: none !important; }
 .tile.axis.armed{ outline: none !important; }
 
@@ -86,3 +93,16 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
 
 /* Prevent text selection/highlight inside the diamond grid */
 #stage, #stage *{ -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+#diamondWrap, #stage, .tile, .cell {
+  will-change: transform;
+  backface-visibility: hidden;
+  /* For smoother scaling of text and borders */
+  transform-style: preserve-3d;
+}
+
+.tile, .cell, .label, .frac {
+  /* Prevent pixelation of text and borders */
+  font-smooth: always;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
