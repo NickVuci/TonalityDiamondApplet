@@ -21,6 +21,7 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 10px 12px;
+  max-width: 300px; 
   box-shadow: 0 6px 24px rgba(0,0,0,.08);
   touch-action: auto;
   transition: width .18s ease, height .18s ease, padding .18s ease, opacity .18s ease, transform .18s ease;
@@ -38,28 +39,18 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
     top: 14px;
     left: 14px;
     z-index: 50;
-    max-width: 340px;
 }
 #instructions { 
     position: absolute; 
     top: 14px; 
     right: 14px; 
     z-index: 50; 
-    max-width: 340px; 
 }
 #audioPanel {
     position: absolute;
     left: 14px;
     bottom: 14px;
     z-index: 50;
-    max-width: 340px;
-}
-#zoomPanel {
-    position: absolute;
-    right: 14px;
-    bottom: 90px; 
-    z-index: 50;
-    max-width: 340px;
 }
 
 /* Diamond wrapper is centered and scaled/rotated by JS */
@@ -90,7 +81,7 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
 /* Grid styling */
 :root{ --grid-color:#0b0d10; --grid-width:2px; }
 .tile{ border: var(--grid-width) solid var(--grid-color) !important; }
-.tile:not(.axis) .cell::after{ content:""; position:absolute; left:-35%; right:-35%; top:50%; height:0; border-top: var(--grid-width) solid var(--grid-color); z-index:2; }
+.tile:not(.axis) .cell::after{ content:""; position:absolute; left:-35%; right:-35%; top:48%; height:0; border-top: var(--grid-width) solid var(--grid-color); z-index:2; }
 .tile .label{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:3; pointer-events:none; }
 .tile .frac{ position:absolute; inset:0; line-height:1; color: var(--grid-color); }
 .tile .frac .n, .tile .frac .d{ position:absolute; left:50%; transform: translate(-50%, -50%); font-weight:700; font-size: calc(var(--cell) * 0.46); text-shadow: 0 1px 2px rgba(255,255,255,.55); }
