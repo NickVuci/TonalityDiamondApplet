@@ -404,7 +404,58 @@
     }catch(e){ console.error('Self-tests error:', e); }
   }
 
+  // ---------- Panel Collapse/Expand ----------
+  function setupPanelCollapseButtons() {
+    const MENU_COLLAPSED_KEY = 'td-menu-collapsed';
+    const INSTRUCTIONS_COLLAPSED_KEY = 'td-instructions-collapsed';
+    
+    const menuPanel = document.getElementById('menu');
+    const instructionsPanel = document.getElementById('instructions');
+    
+    // Add click handlers
+    const togglePanel = (panel, storageKey) => {
+      const isCollapsed = panel.classList.toggle('collapsed');
+      const button = panel.querySelector('.btn-collapse');
+      
+      button.textContent = isCollapsed ? '+' : '−';
+      button.title = isCollapsed ? 'Expand panel' : 'Collapse panel';
+      
+      try {
+        localStorage.setItem(storageKey, isCollapsed.toString());
+      } catch(e) {
+        console.warn('Failed to save panel state to localStorage', e);
+      }
+      
+      // Ensure grid remains properly sized after panel change
+      setTimeout(fitToViewport, 200);
+    };
+    
+    menuPanel.querySelector('.btn-collapse').addEventListener('click', () => {
+      togglePanel(menuPanel, MENU_COLLAPSED_KEY);
+    });
+    
+    instructionsPanel.querySelector('.btn-collapse').addEventListener('click', () => {
+      togglePanel(instructionsPanel, INSTRUCTIONS_COLLAPSED_KEY);
+    });
+    
+    // Load saved state (if any) or use defaults
+    try {
+      const menuCollapsed = localStorage.getItem(MENU_COLLAPSED_KEY);
+      if (menuCollapsed === 'false') {
+        togglePanel(menuPanel, MENU_COLLAPSED_KEY); // Expand if previously expanded
+      }
+      
+      const instructionsCollapsed = localStorage.getItem(INSTRUCTIONS_COLLAPSED_KEY);
+      if (instructionsCollapsed === 'false') {
+        togglePanel(instructionsPanel, INSTRUCTIONS_COLLAPSED_KEY); // Expand if previously expanded
+      }
+    } catch(e) {
+      console.warn('Failed to load panel state from localStorage', e);
+    }
+  }
+
   // Initial render
   build();
+  setupPanelCollapseButtons();
   runSelfTests();
 });

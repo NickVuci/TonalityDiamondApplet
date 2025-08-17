@@ -10,7 +10,7 @@
 --wrap-rot: -45deg;   /* default: horizontal unison */
 --label-rot: 45deg;   /* keep labels upright */
 }
-html, body{ height:100%; text-rendering: optimizeLegibility;}
+html, body{ height:100%; }
 body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
 
 /* Fullscreen viewport */
@@ -26,6 +26,47 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
   touch-action: auto;
   transition: width .18s ease, height .18s ease, padding .18s ease, opacity .18s ease, transform .18s ease;
 }
+
+/* Panel header and collapse/expand controls */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-collapse {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  color: var(--ink);
+}
+
+.btn-collapse:hover {
+  background: #f0f4f9;
+}
+
+/* Collapsed panel state */
+.panel.collapsed #menuContent,
+.panel.collapsed #instructionsContent {
+  display: none;
+}
+
 .btn{ background:#124ae4; color:#fff; border:0; padding:8px 12px; border-radius:10px; font-weight:600; cursor:pointer; box-shadow: 0 2px 0 rgba(0,0,0,.06); }
 .btn.small{ padding:6px 10px; font-size:12px; }
 .btn.secondary{ background:#eff3f9; color:#0b0d10; }

@@ -9,7 +9,11 @@
 <body>
   <div id="viewport">
     <!-- Floating menu (top-left) -->
-    <div id="menu" class="panel" aria-label="Controls">
+    <div id="menu" class="panel collapsed" aria-label="Controls">
+      <div class="panel-header">
+        <h3>Controls</h3>
+        <button class="btn-collapse" aria-label="Toggle menu visibility" title="Expand panel">+</button>
+      </div>
       <div id="menuContent">
         <div class="row">
           <fieldset>
@@ -73,15 +77,21 @@
         </div>
       </div>
     </div>
-    <div id="instructions" class="panel" style="position:absolute; top:14px; right:14px; z-index:50;">
-      <fieldset>
-        <legend>Instructions</legend>
-        <ul>
-          <li>Hold shift to sustain notes</li>
-          <li>Hold shift and click the prime box to play the entire row as a chord</li>
-          <li>click the prime box twice to arpeggiate at the speed of the clicks</li>
-        </ul>
-      </fieldset>
+    <div id="instructions" class="panel collapsed" style="position:absolute; top:14px; right:14px; z-index:50;">
+      <div class="panel-header">
+        <h3>Instructions</h3>
+        <button class="btn-collapse" aria-label="Toggle instructions visibility" title="Expand panel">+</button>
+      </div>
+      <div id="instructionsContent">
+        <fieldset>
+          <legend>Instructions</legend>
+          <ul>
+            <li>Hold shift to sustain notes</li>
+            <li>Hold shift and click the prime box to play the entire row as a chord</li>
+            <li>click the prime box twice to arpeggiate at the speed of the clicks</li>
+          </ul>
+        </fieldset>
+      </div>
     </div>
     <!-- center diamond -->
     <div id="diamondWrap"><div id="stage" class="stage"></div></div>
