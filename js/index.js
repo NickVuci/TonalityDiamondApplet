@@ -230,12 +230,68 @@
     }
     fitToViewport();
     attachAxisHandlers();
+    drawGridLines();
+  }
+
+  // Draw grid lines in SVG (for perfect alignment)
+  function drawGridLines() {
+    const svg = document.getElementById('gridLines');
+    if (!svg) return;
+    
+    svg.innerHTML = ''; // Clear previous lines
+    const N = parseInt(stage.dataset.n || '0', 10);
+    if (N < 1) return;
+    
+    // Get size variables
+    const cs = getComputedStyle(document.documentElement);
+    const cellSize = parseFloat(cs.getPropertyValue('--cell')) || 32;
+    const gridWidth = parseFloat(cs.getPropertyValue('--grid-width')) || 2;
+    const gridColor = cs.getPropertyValue('--grid-color') || '#0b0d10';
+    
+    // Set SVG size
+    const svgSize = (N + 1) * cellSize;
+    svg.setAttribute('width', svgSize);
+    svg.setAttribute('height', svgSize);
+    
+    // Draw horizontal grid lines along cell borders
+    for (let r = 0; r <= N; r++) {
+      // Position lines at cell borders
+      const y = r * cellSize;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', 0);
+      line.setAttribute('y1', y);
+      line.setAttribute('x2', svgSize);
+      line.setAttribute('y2', y);
+      line.setAttribute('stroke', gridColor);
+      line.setAttribute('stroke-width', gridWidth);
+      svg.appendChild(line);
+    }
+    
+    // Draw vertical grid lines along cell borders
+    for (let c = 0; c <= N; c++) {
+      // Position lines at cell borders
+      const x = c * cellSize;
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x);
+      line.setAttribute('y1', 0);
+      line.setAttribute('x2', x);
+      line.setAttribute('y2', svgSize);
+      line.setAttribute('stroke', gridColor);
+      line.setAttribute('stroke-width', gridWidth);
+      svg.appendChild(line);
+    }
   }
 
   // ---------- Layout: fit + zoom (buttons, pinch, ctrl+wheel) ----------
   let baseScale = 1; let userZoom = 1;
   function gridSizePx(){ const N = parseInt(stage.dataset.n||'0',10); const cs = getComputedStyle(document.documentElement); const cell = parseFloat(cs.getPropertyValue('--cell')) || 32; const gap = parseFloat(cs.getPropertyValue('--gap')) || 1; const count = N + 1; const width = count*cell + N*gap; return width; }
-  function applyTransform(){ wrap.style.transform = `translate(-50%,-50%) rotate(var(--wrap-rot)) scale(${(baseScale*userZoom).toFixed(5)})`; const zoomPct = Math.round(userZoom*100); document.getElementById('zoomPct').textContent = zoomPct+"%"; }
+  function applyTransform(){ 
+    wrap.style.transform = `translate(-50%,-50%) rotate(var(--wrap-rot)) scale(${(baseScale*userZoom).toFixed(5)})`; 
+    const zoomPct = Math.round(userZoom*100); 
+    document.getElementById('zoomPct').textContent = zoomPct+"%";
+    // Redraw grid lines on transform changes
+    drawGridLines();
+  }
   function fitToViewport(){ const size = gridSizePx(); const diag = size * Math.SQRT2; const pad = 24; const availW = viewport.clientWidth - pad; const availH = viewport.clientHeight - pad; baseScale = clamp(Math.min(availW/diag, availH/diag), 0.01, 20); if(!isFinite(baseScale) || baseScale<=0) baseScale = 1; applyTransform(); }
   window.addEventListener('resize', fitToViewport);
 

@@ -86,7 +86,10 @@
       </fieldset>
     </div>
     <!-- center diamond -->
-    <div id="diamondWrap"><div id="stage" class="stage"></div></div>
+    <div id="diamondWrap">
+      <svg id="gridLines" style="position:absolute; inset:0; pointer-events:none; z-index:1;"></svg>
+      <div id="stage" class="stage"></div>
+    </div>
         <!-- audio banner (hidden by default) -->
     <div id="audioBanner" class="hidden" role="status" aria-live="polite">
       <span class="msg" id="audioBannerMsg">Audio disabled — tap anywhere or click Enable.</span>

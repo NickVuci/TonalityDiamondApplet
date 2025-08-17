@@ -80,8 +80,7 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
 
 /* Grid styling */
 :root{ --grid-color:#0b0d10; --grid-width:2px; }
-.tile{ border: var(--grid-width) solid var(--grid-color) !important; }
-.tile:not(.axis) .cell::after{ content:""; position:absolute; left:-35%; right:-35%; top:48%; height:0; border-top: var(--grid-width) solid var(--grid-color); z-index:2; }
+.tile{ border: none; } /* Grid lines are now drawn by SVG */
 .tile .label{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:3; pointer-events:none; }
 .tile .frac{ position:absolute; inset:0; line-height:1; color: var(--grid-color); }
 .tile .frac .n, .tile .frac .d{ position:absolute; left:50%; transform: translate(-50%, -50%); font-weight:700; font-size: calc(var(--cell) * 0.46); text-shadow: 0 1px 2px rgba(255,255,255,.55); }
