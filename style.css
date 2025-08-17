@@ -46,12 +46,6 @@ body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, syst
     right: 14px; 
     z-index: 50; 
 }
-#audioPanel {
-    position: absolute;
-    left: 14px;
-    bottom: 14px;
-    z-index: 50;
-}
 
 /* Diamond wrapper is centered and scaled/rotated by JS */
 #diamondWrap{ position:absolute; top:50%; left:50%; transform-origin:center center; will-change: transform; }

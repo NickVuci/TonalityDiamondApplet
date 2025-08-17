@@ -59,20 +59,19 @@
             </div>
             <div class="muted">Flip the unison axis left↔right vs up↕down. (Shortcut: O)</div>
           </fieldset>
+          
+          <fieldset>
+            <legend>Audio</legend>
+            <div class="controls">
+              <div><label>1/1 (Hz)</label><input type="number" id="refHz" min="20" max="2000" step="1" value="392" style="width:110px;"></div>
+              <div><label>Wave</label><select id="wave" style="width:130px;"><option value="sine">sine</option><option value="triangle" selected>triangle</option><option value="square">square</option><option value="sawtooth">sawtooth</option></select></div>
+              <div><label>Attack / Release (ms)</label><div class="inline"><input id="attack" type="number" value="5" min="0" step="1" style="width:80px;"><span class="muted">/</span><input id="release" type="number" value="250" min="10" step="10" style="width:90px;"></div></div>
+              <button id="panic" class="btn danger" style="margin-top:6px;">Panic (stop all)</button>
+            </div>
+          </fieldset>
 
         </div>
       </div>
-    </div>
-    <div id="audioPanel" class="panel">
-      <fieldset>
-        <legend>Audio</legend>
-        <div class="controls">
-          <div><label>1/1 (Hz)</label><input type="number" id="refHz" min="20" max="2000" step="1" value="392" style="width:110px;"></div>
-          <div><label>Wave</label><select id="wave" style="width:130px;"><option value="sine">sine</option><option value="triangle" selected>triangle</option><option value="square">square</option><option value="sawtooth">sawtooth</option></select></div>
-          <div><label>Attack / Release (ms)</label><div class="inline"><input id="attack" type="number" value="5" min="0" step="1" style="width:80px;"><span class="muted">/</span><input id="release" type="number" value="250" min="10" step="10" style="width:90px;"></div></div>
-          <button id="panic" class="btn danger" style="margin-top:6px;">Panic (stop all)</button>
-        </div>
-      </fieldset>
     </div>
     <div id="instructions" class="panel" style="position:absolute; top:14px; right:14px; z-index:50;">
       <fieldset>
