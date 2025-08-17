@@ -10,7 +10,7 @@
 --wrap-rot: -45deg;   /* default: horizontal unison */
 --label-rot: 45deg;   /* keep labels upright */
 }
-html, body{ height:100%; }
+html, body{ height:100%; text-rendering: optimizeLegibility;}
 body{ margin:0; background:var(--bg); color:var(--ink); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
 
 /* Fullscreen viewport */
