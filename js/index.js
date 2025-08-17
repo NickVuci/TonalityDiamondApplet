@@ -119,38 +119,16 @@
   function noteOff(key){
     const s = active.get(key);
     if(!s) return;
-    const relMs = Math.max(10, parseFloat(document.getElementById('release').value||'250'));
-    const relSec = relMs / 1000;
-    const now = actx && actx.currentTime ? actx.currentTime : 0;
-
     try{
-      const g = s.g && s.g.gain;
-      const min = 1e-5; // floor > 0 for exponential ramps
-      if(g){
-        if(typeof g.cancelScheduledValues === 'function') g.cancelScheduledValues(now);
-        if(typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
-        const cur = Math.max(min, g.value || 0.0001);
-        g.setValueAtTime(cur, now);
-        if(typeof g.exponentialRampToValueAtTime === 'function'){
-          g.exponentialRampToValueAtTime(min, now + relSec);
-        } else if(hasTarget(g)){
-          const tau = Math.max(0.005, relSec/5);
-          g.setTargetAtTime(min, now, tau);
-        } else if(typeof g.linearRampToValueAtTime === 'function'){
-          g.linearRampToValueAtTime(0.0, now + relSec);
-        } else {
-          g.setValueAtTime(min, now + relSec);
+        if(s.g && s.g.gain){
+        s.g.gain.cancelScheduledValues && s.g.gain.cancelScheduledValues(0);
+        s.g.gain.setValueAtTime && s.g.gain.setValueAtTime(0, actx.currentTime || 0);
         }
-      }
-      const stopAt = now + relSec + 0.03;
-      if(s.o && typeof s.o.stop === 'function'){
-        try{ s.o.stop(stopAt); }catch{}
-      }
-      setTimeout(()=>{ try{ s.o && s.o.disconnect && s.o.disconnect(); s.g && s.g.disconnect && s.g.disconnect(); }catch{} active.delete(key); }, Math.max(40, (relSec+0.06)*1000));
-    }catch(e){
-      try{ s.o && s.o.stop(); }catch{}
-      active.delete(key);
-    }
+        s.o && s.o.stop && s.o.stop();
+        s.o && s.o.disconnect && s.o.disconnect();
+        s.g && s.g.disconnect && s.g.disconnect();
+    }catch(e){}
+    active.delete(key);
   }
   function stopAll(){ for(const k of Array.from(active.keys())) noteOff(k); if(window._stopAllSustain) window._stopAllSustain(); }
   document.getElementById('panic').addEventListener('click', stopAll);
@@ -246,7 +224,7 @@
         frac.appendChild(n); frac.appendChild(bar); frac.appendChild(d);
         label.appendChild(frac);
         const tip=document.createElement('div'); tip.className='tip'; const base=ratioFor(sn,sd); const cents=1200*Math.log2(base); tip.textContent=`${labelText} • ${(parseFloat(document.getElementById('refHz').value||'392')*base).toFixed(2)} Hz • ${(cents>=0?'+':'')+cents.toFixed(2)}¢`;
-        cell.appendChild(label); cell.appendChild(tip);
+        cell.appendChild(label);
         tile.appendChild(cell); stage.appendChild(tile);
       }
     }
@@ -347,25 +325,6 @@
 
   // Re-render labels only when label mode changes
   document.querySelectorAll('input[name="labels"]').forEach(r=> r.addEventListener('change', ()=>{ if(currentNums.length) render(currentNums); }));
-
-  // ---------- Menu collapse/expand ----------
-  const menu = document.getElementById('menu');
-  const menuToggle = document.getElementById('menuToggle');
-  const MENU_KEY='td-menu-collapsed';
-  function setMenuCollapsed(collapsed){ menu.classList.toggle('collapsed', collapsed); menuToggle.setAttribute('aria-expanded', String(!collapsed)); menuToggle.title = collapsed ? 'Expand (M)' : 'Collapse (M)'; menuToggle.textContent = collapsed ? '⟩⟩' : '⟨⟨'; try{ localStorage.setItem(MENU_KEY, collapsed?'1':'0'); }catch{} }
-  menuToggle.addEventListener('click', ()=> setMenuCollapsed(!menu.classList.contains('collapsed')));
-  window.addEventListener('keydown', (e)=>{ if(e.key.toLowerCase()==='m'){ setMenuCollapsed(!menu.classList.contains('collapsed')); } });
-  try{ const saved = localStorage.getItem(MENU_KEY); if(saved==='1') setMenuCollapsed(true); }catch{}
-  const instructions = document.getElementById('instructions');
-    const instructionsToggle = document.getElementById('instructionsToggle');
-    function setInstructionsCollapsed(collapsed) {
-    instructions.classList.toggle('collapsed', collapsed);
-    instructionsToggle.setAttribute('aria-expanded', !collapsed);
-    }
-    instructionsToggle.addEventListener('click', () => {
-    setInstructionsCollapsed(!instructions.classList.contains('collapsed'));
-    });
-
 
   // ---------- Optional: lightweight self-tests (opt-in) ----------
   function runSelfTests(){
