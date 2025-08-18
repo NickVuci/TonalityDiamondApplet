@@ -7,13 +7,26 @@
   }
 })(function init(){
   'use strict';
-  // ---------- Helpers ----------
-  const gcd=(a,b)=>{a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;};
-  const primesUpTo=(n)=>{n=Math.max(2, n|0);const s=new Array(n+1).fill(true);s[0]=s[1]=false;for(let p=2;p*p<=n;p++) if(s[p]) for(let k=p*p;k<=n;k+=p) s[k]=false;return [...Array(n+1).keys()].filter(i=>s[i]);};
-  const factorAllowed=(n,allow)=>{if(n===1) return true; let m=n; for(const p of allow){ while(m%p===0) m/=p; } return m===1; };
-  const normalizeFloat=(r)=>{ let x=r; while(x>=2) x/=2; while(x<1) x*=2; return x; };
-  const hue=(n)=> (n*137+61)%360; const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; const soften=(c)=>{ const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); if(!m) return c; const h=+m[1], s=+m[2], l=+m[3]; return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; };
-  const clamp=(x,a,b)=> Math.min(b, Math.max(a,x));
+  
+  // Import modules
+  import('./modules/audio.js').then(audioModule => {
+    // Initialize audio module and start app
+    initApp(audioModule);
+  });
+  
+  function initApp(audioModule) {
+    const { 
+      initAudio, ensureAudio, noteOn, noteOff, stopAll, 
+      rtof, isNoteActive, showAudioBanner, hideAudioBanner 
+    } = audioModule;
+  
+    // ---------- Helpers ----------
+    const gcd=(a,b)=>{a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;};
+    const primesUpTo=(n)=>{n=Math.max(2, n|0);const s=new Array(n+1).fill(true);s[0]=s[1]=false;for(let p=2;p*p<=n;p++) if(s[p]) for(let k=p*p;k<=n;k+=p) s[k]=false;return [...Array(n+1).keys()].filter(i=>s[i]);};
+    const factorAllowed=(n,allow)=>{if(n===1) return true; let m=n; for(const p of allow){ while(m%p===0) m/=p; } return m===1; };
+    const normalizeFloat=(r)=>{ let x=r; while(x>=2) x/=2; while(x<1) x*=2; return x; };
+    const hue=(n)=> (n*137+61)%360; const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; const soften=(c)=>{ const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); if(!m) return c; const h=+m[1], s=+m[2], l=+m[3]; return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; };
+    const clamp=(x,a,b)=> Math.min(b, Math.max(a,x));
 
     // Attach build triggers to relevant inputs
     function attachBuildTriggers() {
@@ -53,35 +66,7 @@
     return `hsl(${h} ${s.toFixed(1)}% ${l}%)`;
   }
 
-  // ---------- Audio (robust + banner) ----------
-  let actx=null, master=null; const active=new Map();
-  const audioBanner = document.getElementById('audioBanner');
-  const audioBannerMsg = document.getElementById('audioBannerMsg');
-  const enableAudioBtn = document.getElementById('enableAudio');
-  const showAudioBanner=(msg)=>{ if(msg) audioBannerMsg.textContent=msg; audioBanner.classList.remove('hidden'); };
-  const hideAudioBanner=()=>{ audioBanner.classList.add('hidden'); };
-
-  function hasTarget(param){ return param && typeof param.setTargetAtTime==="function"; }
-  async function ensureAudio(){
-    const Ctor = window.AudioContext || window.webkitAudioContext;
-    if(!Ctor){ showAudioBanner('Audio not supported in this browser.'); return null; }
-    if(!actx){
-      try{ actx=new Ctor(); }
-      catch(err){ console.error('AudioContext creation failed', err); showAudioBanner('Audio failed to initialize.'); return null; }
-      try{
-        master=actx.createGain(); master.gain.value=0.18; master.connect(actx.destination);
-        const o=actx.createOscillator(); const g=actx.createGain(); g.gain.value=0; o.connect(g); g.connect(master); o.start(); o.stop(actx.currentTime);
-      }catch(err){ console.error('Audio node graph failed', err); showAudioBanner('Audio failed to initialize.'); return null; }
-      actx.onstatechange = ()=>{ if(actx.state==='running') hideAudioBanner(); else showAudioBanner('Audio disabled — tap anywhere or click Enable.'); };
-    }
-    if(actx.state==='suspended'){
-      try{ await actx.resume(); }catch(e){ /* user gesture required */ }
-    }
-    if(actx.state!=='running') showAudioBanner('Audio disabled — tap anywhere or click Enable.'); else hideAudioBanner();
-    return actx;
-  }
-
-  // Pitch + keys
+  // ---------- Pitch and ratio calculations ----------
   function normalizeFrac(sn,sd){
     if(sn===sd) return [1,1];
     let n=sn, d=sd;
@@ -100,45 +85,10 @@
     }
     return `note-${sn}/${sd}`;
   }
-  function rtof(r){ const ref=parseFloat(document.getElementById('refHz').value||'392'); return ref*r; }
 
-  async function noteOn(key,f){
-    await ensureAudio();
-    if(!actx){ console.warn('Audio unavailable'); return; }
-    if(active.has(key)) return;
-    const o=actx.createOscillator(); const g=actx.createGain();
-    o.type=document.getElementById('wave').value; o.frequency.value=f;
-    g.gain.value=0.0001; o.connect(g); g.connect(master);
-    const att=Math.max(0,parseFloat(document.getElementById('attack').value||'5'))/1000;
-    const now=actx.currentTime||0;
-    if(hasTarget(g.gain)) g.gain.setTargetAtTime(1.0, now, Math.max(0.001, att)); else g.gain.setValueAtTime(1.0, now);
-    o.start();
-    active.set(key,{o,g});
-    hideAudioBanner();
-  }
-  function noteOff(key){
-    const s = active.get(key);
-    if(!s) return;
-    try{
-        if(s.g && s.g.gain){
-        s.g.gain.cancelScheduledValues && s.g.gain.cancelScheduledValues(0);
-        s.g.gain.setValueAtTime && s.g.gain.setValueAtTime(0, actx.currentTime || 0);
-        }
-        s.o && s.o.stop && s.o.stop();
-        s.o && s.o.disconnect && s.o.disconnect();
-        s.g && s.g.disconnect && s.g.disconnect();
-    }catch(e){}
-    active.delete(key);
-  }
-  function stopAll(){ for(const k of Array.from(active.keys())) noteOff(k); if(window._stopAllSustain) window._stopAllSustain(); }
+  // Initialize audio module
+  initAudio();
   document.getElementById('panic').addEventListener('click', stopAll);
-
-  const gestureResume=()=>{ if(!actx || actx.state!=='running'){ ensureAudio(); } };
-  document.addEventListener('pointerdown', gestureResume, true);
-  document.addEventListener('keydown', gestureResume, true);
-
-  document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ stopAll(); } else { if(!actx || actx.state!=='running') showAudioBanner('Audio disabled — tap anywhere or click Enable.'); } });
-  enableAudioBtn.addEventListener('click', ()=>{ ensureAudio(); });
 
   // ---------- Build ----------
   const viewport = document.getElementById('viewport');
@@ -258,13 +208,48 @@
   window.addEventListener('keyup', (e)=>{ if(e.key === 'Shift'){ mods.shift = false; releaseSustained(); }});
 
   const sustainKeys = new Set();
-  function releaseSustained(){ for(const key of Array.from(sustainKeys)){ noteOff(key); sustainKeys.delete(key); } stage.querySelectorAll('.tile.play').forEach(t=>{ const k=noteKeyFor(+t.dataset.num, +t.dataset.den); if(!active.has(k)) t.classList.remove('play'); }); }
+  function releaseSustained(){ 
+    for(const key of Array.from(sustainKeys)){ 
+      noteOff(key); 
+      sustainKeys.delete(key); 
+    } 
+    stage.querySelectorAll('.tile.play').forEach(t=>{ 
+      const k=noteKeyFor(+t.dataset.num, +t.dataset.den); 
+      if(!isNoteActive(k)) t.classList.remove('play'); 
+    }); 
+  }
   window._stopAllSustain = () => releaseSustained();
 
   const gesture={ active:false, pointerId:null, touched:new Set() };
   function tileFromPoint(x,y){ let el=document.elementFromPoint(x,y); while(el && el!==stage && !el.classList.contains('tile')) el=el.parentElement; if(el && el.classList.contains('tile') && !el.classList.contains('axis')) return el; return null; }
-  async function triggerTile(tile){ if(!tile) return; const sn=+tile.dataset.num, sd=+tile.dataset.den; const key=noteKeyFor(sn,sd); if(gesture.touched.has(key)) return; gesture.touched.add(key); tile.classList.add('play'); await noteOn(key, rtof(ratioFor(sn,sd))); if(mods.shift){ sustainKeys.add(key); } else { const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); setTimeout(()=>{ noteOff(key); if(!active.has(key)) tile.classList.remove('play'); }, relMs+40); } }
-  function endGesture(){ if(!gesture.active) return; gesture.active=false; gesture.pointerId=null; gesture.touched.clear(); stage.querySelectorAll('.tile.play').forEach(t=>{ const k=noteKeyFor(+t.dataset.num, +t.dataset.den); if(!active.has(k)) t.classList.remove('play'); }); }
+  async function triggerTile(tile){ 
+    if(!tile) return; 
+    const sn=+tile.dataset.num, sd=+tile.dataset.den; 
+    const key=noteKeyFor(sn,sd); 
+    if(gesture.touched.has(key)) return; 
+    gesture.touched.add(key); 
+    tile.classList.add('play'); 
+    await noteOn(key, rtof(ratioFor(sn,sd))); 
+    if(mods.shift){ 
+      sustainKeys.add(key); 
+    } else { 
+      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
+      setTimeout(()=>{ 
+        noteOff(key); 
+        if(!isNoteActive(key)) tile.classList.remove('play'); 
+      }, relMs+40); 
+    } 
+  }
+  function endGesture(){ 
+    if(!gesture.active) return; 
+    gesture.active=false; 
+    gesture.pointerId=null; 
+    gesture.touched.clear(); 
+    stage.querySelectorAll('.tile.play').forEach(t=>{ 
+      const k=noteKeyFor(+t.dataset.num, +t.dataset.den); 
+      if(!isNoteActive(k)) t.classList.remove('play'); 
+    }); 
+  }
   stage.addEventListener('pointerdown', async ev=>{ if(ev.target.closest('.tile.axis')) return; ev.preventDefault(); gesture.active=true; gesture.pointerId=ev.pointerId; gesture.touched.clear(); await triggerTile(tileFromPoint(ev.clientX, ev.clientY)); });
   window.addEventListener('pointermove', async ev=>{ if(!gesture.active || ev.pointerId!==gesture.pointerId) return; await triggerTile(tileFromPoint(ev.clientX, ev.clientY)); });
   window.addEventListener('pointerup', ev=>{ if(gesture.active && ev.pointerId===gesture.pointerId) endGesture(); });
@@ -275,8 +260,42 @@
   const axisClickState = new WeakMap();
   function collectLineCells(ax){ const val=ax.dataset.value; const isRow=ax.dataset.axis==='row'; const sel=isRow? `.tile[data-a="${val}"]` : `.tile[data-b="${val}"]`; return Array.from(stage.querySelectorAll(sel)); }
   function uniqueKeysFromCells(cells){ const keys=[]; const seen=new Set(); for(const c of cells){ const k=noteKeyFor(+c.dataset.num, +c.dataset.den); if(!seen.has(k)){ seen.add(k); keys.push(k); } } return keys; }
-  async function playChord(ax, sustain){ const cells=collectLineCells(ax); const keys=uniqueKeysFromCells(cells); await ensureAudio(); for(const c of cells){ c.classList.add('play'); } await Promise.all(keys.map(async k=>{ const [sn,sd]=k.replace('note-','').split('/').map(Number); await noteOn(k, rtof(ratioFor(sn,sd))); })); if(sustain){ keys.forEach(k=>sustainKeys.add(k)); } else { const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); setTimeout(()=> keys.forEach(noteOff), relMs+40); } }
-  async function playArpeggio(ax, stepMs){ const cells=collectLineCells(ax); const keys=uniqueKeysFromCells(cells); await ensureAudio(); cells.forEach(c=>c.classList.add('play')); let i=0; const id=setInterval(async ()=>{ if(i>=keys.length){ clearInterval(id); return; } const k=keys[i++]; const [sn,sd]=k.replace('note-','').split('/').map(Number); await noteOn(k, rtof(ratioFor(sn,sd))); const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); setTimeout(()=> noteOff(k), relMs+40); }, Math.max(40, Math.min(1200, stepMs||120))); }
+  async function playChord(ax, sustain){ 
+    const cells=collectLineCells(ax); 
+    const keys=uniqueKeysFromCells(cells); 
+    await ensureAudio(); 
+    for(const c of cells){ 
+      c.classList.add('play'); 
+    } 
+    await Promise.all(keys.map(async k=>{ 
+      const [sn,sd]=k.replace('note-','').split('/').map(Number); 
+      await noteOn(k, rtof(ratioFor(sn,sd))); 
+    })); 
+    if(sustain){ 
+      keys.forEach(k=>sustainKeys.add(k)); 
+    } else { 
+      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
+      setTimeout(()=> keys.forEach(noteOff), relMs+40); 
+    } 
+  }
+  async function playArpeggio(ax, stepMs){ 
+    const cells=collectLineCells(ax); 
+    const keys=uniqueKeysFromCells(cells); 
+    await ensureAudio(); 
+    cells.forEach(c=>c.classList.add('play')); 
+    let i=0; 
+    const id=setInterval(async ()=>{ 
+      if(i>=keys.length){ 
+        clearInterval(id); 
+        return; 
+      } 
+      const k=keys[i++]; 
+      const [sn,sd]=k.replace('note-','').split('/').map(Number); 
+      await noteOn(k, rtof(ratioFor(sn,sd))); 
+      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
+      setTimeout(()=> noteOff(k), relMs+40); 
+    }, Math.max(40, Math.min(1200, stepMs||120))); 
+  }
   function attachAxisHandlers(){ stage.querySelectorAll('.tile.axis[data-axis]').forEach(ax=>{ ax.addEventListener('click', async ev=>{ ev.preventDefault(); if(mods.shift){ await playChord(ax, true); return; } let st = axisClickState.get(ax) || {}; if(!st.armTs){ st.armTs = performance.now(); if(st.timer) clearTimeout(st.timer); ax.classList.add('armed'); st.timer = setTimeout(()=>{ axisClickState.set(ax, {}); ax.classList.remove('armed'); }, 2000); axisClickState.set(ax, st); } else { const step = Math.max(40, Math.min(1200, performance.now() - st.armTs)); if(st.timer) clearTimeout(st.timer); axisClickState.set(ax, {}); ax.classList.remove('armed'); await playArpeggio(ax, step); } }); }); }
 
   // ---------- Orientation ----------
@@ -334,9 +353,9 @@
       if(!on) return; // opt-in only
 
       const assert = (name, cond)=> console[(cond?'log':'error')]((cond?'✓ ':'✗ ')+name);
-      const _noteOn = noteOn, _noteOff = noteOff; // stub audio for silent tests
-      window.noteOn = async (key)=>{ active.set(key, {o:null,g:null}); };
-      window.noteOff = (key)=>{ active.delete(key); };
+      const _noteOn = audioModule.noteOn, _noteOff = audioModule.noteOff; // stub audio for silent tests
+      window.noteOn = async (key)=>{ window.active = window.active || new Map(); window.active.set(key, {o:null,g:null}); };
+      window.noteOff = (key)=>{ if(window.active) window.active.delete(key); };
 
       // Build: limit mode L=5, P blank
       document.getElementById('m-limit').checked = true;
@@ -458,4 +477,6 @@
   build();
   setupPanelCollapseButtons();
   runSelfTests();
+  
+  } // end of initApp function
 });
