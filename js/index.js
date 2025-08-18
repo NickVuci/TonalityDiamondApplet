@@ -9,24 +9,34 @@
   'use strict';
   
   // Import modules
-  import('./modules/audio.js').then(audioModule => {
+  Promise.all([
+    import('./modules/audio.js'),
+    import('./modules/math.js')
+  ]).then(([audioModule, mathModule]) => {
     // Initialize audio module and start app
-    initApp(audioModule);
+    initApp(audioModule, mathModule);
   });
   
-  function initApp(audioModule) {
+  function initApp(audioModule, mathModule) {
     const { 
       initAudio, ensureAudio, noteOn, noteOff, stopAll, 
       rtof, isNoteActive, showAudioBanner, hideAudioBanner 
     } = audioModule;
+    
+    const {
+      gcd, primesUpTo, factorAllowed, normalizeFloat, normalizeFrac,
+      largestPrimeFactor, oddset, limitset, parseCustom, clamp
+    } = mathModule;
   
     // ---------- Helpers ----------
-    const gcd=(a,b)=>{a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;};
-    const primesUpTo=(n)=>{n=Math.max(2, n|0);const s=new Array(n+1).fill(true);s[0]=s[1]=false;for(let p=2;p*p<=n;p++) if(s[p]) for(let k=p*p;k<=n;k+=p) s[k]=false;return [...Array(n+1).keys()].filter(i=>s[i]);};
-    const factorAllowed=(n,allow)=>{if(n===1) return true; let m=n; for(const p of allow){ while(m%p===0) m/=p; } return m===1; };
-    const normalizeFloat=(r)=>{ let x=r; while(x>=2) x/=2; while(x<1) x*=2; return x; };
-    const hue=(n)=> (n*137+61)%360; const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; const soften=(c)=>{ const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); if(!m) return c; const h=+m[1], s=+m[2], l=+m[3]; return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; };
-    const clamp=(x,a,b)=> Math.min(b, Math.max(a,x));
+    const hue=(n)=> (n*137+61)%360; 
+    const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; 
+    const soften=(c)=>{ 
+      const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); 
+      if(!m) return c; 
+      const h=+m[1], s=+m[2], l=+m[3]; 
+      return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; 
+    };
 
     // Attach build triggers to relevant inputs
     function attachBuildTriggers() {
@@ -39,23 +49,6 @@
     }
     attachBuildTriggers();
   // --- Prime-base color mapping: prime gets full saturation, composites desaturate progressively ---
-  function largestPrimeFactor(n){
-    n = Math.abs(n|0);
-    if (n <= 1) return 1;
-    let maxPrime = 1;
-    while (n % 2 === 0) {
-        maxPrime = 2;
-        n /= 2;
-    }
-    for (let p = 3; p * p <= n; p += 2) {
-        while (n % p === 0) {
-        maxPrime = p;
-        n /= p;
-        }
-    }
-    if (n > 2) maxPrime = n;
-    return maxPrime;
-  }
   function colorByPrimeBase(n){
     if(n===1) return "#f2f4f8"; // special-case unison color
     const p = largestPrimeFactor(n);
@@ -67,16 +60,15 @@
   }
 
   // ---------- Pitch and ratio calculations ----------
-  function normalizeFrac(sn,sd){
-    if(sn===sd) return [1,1];
-    let n=sn, d=sd;
-    while(n/d >= 2){ d*=2; }
-    while(n/d < 1){ n*=2; }
-    const g=gcd(n,d);
-    return [n/g, d/g];
+  function labelMode(){ 
+    return document.querySelector('input[name="labels"]:checked').value;
   }
-  const labelMode=()=> document.querySelector('input[name="labels"]:checked').value;
-  function ratioFor(sn,sd){ const r = sn/sd; return (labelMode()==='norm') ? normalizeFloat(r) : r; }
+  
+  function ratioFor(sn,sd){ 
+    const r = sn/sd; 
+    return (labelMode()==='norm') ? normalizeFloat(r) : r;
+  }
+  
   function noteKeyFor(sn,sd){
     // Key identity should mirror the audible pitch so we don't duplicate the same note
     if(labelMode()==='norm'){
@@ -111,16 +103,6 @@
       primeHueMap.set(primes[i], h);
     }
   }
-
-  const oddset=L=>{ const out=[]; for(let i=1;i<=L;i+=2) out.push(i); return out; };
-  const limitset=(L,P)=>{ // odd-limit base, optionally filtered by prime-limit intersection
-    L = Math.max(1, L|0); if(L%2===0) L--; const odds = oddset(L);
-    const p = parseInt(P, 10);
-    if(!isFinite(p) || p<2) return odds;
-    const allow = primesUpTo(p);
-    return odds.filter(n=> factorAllowed(n, allow));
-  };
-  const parseCustom=(text)=>{ const arr=(text||'').split(/[^\d]+/).filter(Boolean).map(x=>parseInt(x,10)).filter(n=>Number.isFinite(n)&&n>0); const out=[]; const seen=new Set(); for(const n of arr){ if(!seen.has(n)){ seen.add(n); out.push(n); } } return out; };
 
   function makeLabel(a,b,sn,sd){
     if(labelMode()==='rows') return `${b}/${a}`;
