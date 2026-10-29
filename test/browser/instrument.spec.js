@@ -674,3 +674,38 @@ test('corner anchors and dropdowns respect phone safe areas', async ({page}) => 
     await page.reload();
   }
 });
+
+
+test('first touch retries audio on release after a Safari-style pending resume', async ({browser}) => {
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  const page=await context.newPage();
+  await page.addInitScript(()=>{
+    const NativeContext=window.AudioContext;
+    const stats=window.audioUnlockTest={released:false,calls:0,starts:0,session:''};
+    document.addEventListener('pointerup',()=>{stats.released=true;},{capture:true});
+    Object.defineProperty(navigator,'audioSession',{configurable:true,value:{set type(value){stats.session=value;}}});
+    window.AudioContext=class extends NativeContext {
+      constructor(){super();this.blocked=true;}
+      get state(){return this.blocked?'suspended':super.state;}
+      resume(){
+        stats.calls++;
+        if(!stats.released)return new Promise(()=>{});
+        this.blocked=false;return super.resume();
+      }
+      createOscillator(){
+        const node=super.createOscillator(),start=node.start.bind(node);
+        node.start=(...args)=>{stats.starts++;return start(...args);};return node;
+      }
+    };
+  });
+  await page.goto('/');
+  await page.locator('.note[data-row="1"][data-col="1"]').tap();
+  await expect.poll(()=>page.evaluate(()=>audioUnlockTest.starts)).toBe(1);
+  expect(await page.evaluate(()=>audioUnlockTest.calls)).toBeGreaterThanOrEqual(2);
+  expect(await page.evaluate(()=>audioUnlockTest.session)).toBe('playback');
+  await expect(page.locator('#audioBanner')).toHaveClass(/hidden/);
+  await page.getByRole('button',{name:'Stop all',exact:true}).tap();
+  await page.locator('.note[data-row="1"][data-col="2"]').tap();
+  await expect.poll(()=>page.evaluate(()=>audioUnlockTest.starts)).toBe(2);
+  await context.close();
+});

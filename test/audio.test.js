@@ -94,3 +94,73 @@ test('a failed sustained note or chord can be retried without a dead toggle', as
   assert.equal(engine.voices.size, 1);
   player.stop();
 });
+
+
+test('a fresh touch release unlocks every note behind an earlier hanging resume', async () => {
+  const {ctx,oscillators}=context({suspended:true});
+  let calls=0;
+  ctx.resume=()=>{
+    if(++calls===1)return new Promise(()=>{});
+    ctx.state='running'; return Promise.resolve();
+  };
+  const engine=new AudioEngine({contextFactory:()=>ctx});
+  engine.play('1/1',220);engine.play('3/2',330);
+  assert.equal(calls,1);
+  assert.equal(oscillators.length,0);
+  assert.equal(await engine.ensure(true),true);
+  await tick();
+  assert.equal(calls,2);
+  assert.equal(oscillators.length,2);
+  assert.ok(oscillators.every(o=>o.starts===1));
+  engine.stopAll();
+});
+
+test('Stop cancels queued notes before a fresh activation unlocks the context', async () => {
+  const {ctx,oscillators}=context({suspended:true});
+  let calls=0;
+  ctx.resume=()=>{ if(++calls===1)return new Promise(()=>{});ctx.state='running';return Promise.resolve(); };
+  const engine=new AudioEngine({contextFactory:()=>ctx});
+  engine.play('1/1',220);engine.stopAll();
+  await engine.ensure(true);await tick();
+  assert.equal(oscillators.length,0);
+});
+
+test('an interrupted context resumes on the next gesture and reports its pause', async () => {
+  const {ctx,oscillators}=context();
+  const statuses=[];
+  const engine=new AudioEngine({contextFactory:()=>ctx,onStatus:(message,error)=>statuses.push({message,error})});
+  await engine.ensure();
+  ctx.state='interrupted';ctx.onstatechange();
+  assert.equal(statuses.at(-1).error,true);
+  engine.play('1/1',220);await tick();
+  assert.equal(ctx.state,'running');
+  assert.equal(oscillators.length,1);
+  assert.equal(statuses.at(-1).error,false);
+  engine.stopAll();
+});
+
+test('a denied resume leaves the engine retryable without retaining dead voices', async () => {
+  const {ctx}=context({suspended:true});
+  ctx.resume=()=>Promise.reject(new Error('NotAllowedError'));
+  const engine=new AudioEngine({contextFactory:()=>ctx});
+  engine.play('1/1',220);await tick();
+  assert.equal(engine.voices.size,0);
+  assert.equal(engine.resumeAttempt,null);
+  ctx.resume=()=>{ctx.state='running';return Promise.resolve();};
+  engine.play('1/1',220);await tick();
+  assert.equal(engine.voices.size,1);
+  engine.stopAll();
+});
+
+
+test('an already-running context releases notes even before its statechange event arrives', async () => {
+  const {ctx,oscillators}=context({suspended:true});
+  ctx.resume=()=>new Promise(()=>{});
+  const engine=new AudioEngine({contextFactory:()=>ctx});
+  engine.play('1/1',220);
+  ctx.state='running';
+  await engine.ensure(true);await tick();
+  assert.equal(oscillators.length,1);
+  assert.equal(engine.resumeAttempt,null);
+  engine.stopAll();
+});

@@ -168,7 +168,17 @@ $('axisMode').addEventListener('change', () => {
   player.cancelSequence(); clearArmed(); update({ axisMode: $('axisMode').value }, false);
 });
 $('panic').addEventListener('click', stop);
-$('enableAudio').addEventListener('click', () => { void audio.ensure(); });
+$('enableAudio').addEventListener('click', () => { void audio.ensure(true); });
+// A touch-down can play immediately once unlocked, but Safari grants the first
+// activation on release. Retry then so the original queued note can start.
+function unlockAudio() {
+  if (audio.context && audio.context.state !== 'running') void audio.ensure(true);
+}
+$('viewport').addEventListener('pointerup', event => {
+  if (event.pointerType !== 'mouse') unlockAudio();
+}, { capture: true });
+$('viewport').addEventListener('touchend', unlockAudio, { capture: true, passive: true });
+$('viewport').addEventListener('click', unlockAudio, { capture: true });
 $('sustain').addEventListener('click', () => {
   sustain = !sustain; $('sustain').setAttribute('aria-pressed', String(sustain));
   if (!sustain) player.releaseHeld('latch');

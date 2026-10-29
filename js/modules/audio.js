@@ -15,35 +15,70 @@ export class AudioEngine {
     this.voices = new Map();
     this.fading = new Set();
     this.nextId = 0;
-    this.resumePromise = null;
+    this.resumeAttempt = null;
   }
-  async ensure() {
+  resume(retry) {
+    if (this.context.state === 'running') {
+      this.resumeAttempt?.finish(true);
+      return Promise.resolve(true);
+    }
+    let attempt = this.resumeAttempt;
+    const fresh = !attempt;
+    if (fresh) {
+      const ctx = this.context;
+      attempt = { done: false };
+      attempt.promise = new Promise(resolve => {
+        attempt.finish = ready => {
+          if (attempt.done) return;
+          attempt.done = true;
+          clearTimeout(attempt.timer);
+          if (this.resumeAttempt === attempt) this.resumeAttempt = null;
+          resolve(ready);
+        };
+      });
+      // Safari can leave resume() pending when the first call was outside activation.
+      attempt.timer = setTimeout(() => attempt.finish(ctx.state === 'running'), 1500);
+      this.resumeAttempt = attempt;
+    }
+    if (fresh || retry) {
+      const ctx = this.context;
+      try {
+        // Invoke synchronously during the new tap, even if an older call is pending.
+        Promise.resolve(ctx.resume()).then(() => attempt.finish(ctx.state === 'running'), () => attempt.finish(false));
+      } catch { attempt.finish(false); }
+    }
+    return attempt.promise;
+  }
+  async ensure(retry = false) {
     try {
       if (!this.context) {
+        // A musical instrument needs media playback, including on iPhones in Silent Mode.
+        try { if (globalThis.navigator?.audioSession) globalThis.navigator.audioSession.type = 'playback'; } catch { /* Optional on older Safari. */ }
         const ctx = this.contextFactory();
-        this.context = ctx;
-        this.master = ctx.createGain();
-        this.master.gain.value = this.volume * 0.55;
+        const master = ctx.createGain();
+        master.gain.value = this.volume * 0.55;
         // Harmonic partials only: no detuning or chorus to blur the JI relationships.
-        this.warmWave = ctx.createPeriodicWave(new Float32Array(6), new Float32Array([0, 1, 0.18, 0.065, 0.025, 0.01]));
+        const warmWave = ctx.createPeriodicWave(new Float32Array(6), new Float32Array([0, 1, 0.18, 0.065, 0.025, 0.01]));
         const compressor = ctx.createDynamicsCompressor();
         compressor.threshold.value = -16;
         compressor.knee.value = 18;
         compressor.ratio.value = 4;
         compressor.attack.value = 0.012;
         compressor.release.value = 0.3;
-        this.master.connect(compressor);
+        master.connect(compressor);
         compressor.connect(ctx.destination);
+        this.context = ctx; this.master = master; this.warmWave = warmWave;
+        ctx.onstatechange = () => {
+          if (ctx !== this.context) return;
+          if (ctx.state === 'running') this.resumeAttempt?.finish(true);
+          else this.onStatus('Audio paused. Tap Enable or a note to restart sound.', true);
+        };
       }
-      if (this.context.state !== 'running') {
-        this.resumePromise ||= this.context.resume().finally(() => { this.resumePromise = null; });
-        await this.resumePromise;
-      }
-      if (this.context.state !== 'running') throw new Error('Audio needs a tap to start.');
+      if (!await this.resume(retry)) throw new Error('Audio needs a tap to start.');
       this.onStatus('Audio ready', false);
       return true;
     } catch {
-      this.onStatus('Audio paused. Tap a note to enable sound.', true);
+      this.onStatus('Audio paused. Tap Enable or a note to restart sound.', true);
       return false;
     }
   }
