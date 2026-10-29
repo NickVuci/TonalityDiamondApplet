@@ -1,157 +1,88 @@
-/**
- * Math utilities module for Tonality Diamond Applet
- * Provides functions for calculations related to ratios, primes, and normalization
- */
+/** Bounded, exact integer ratios for the diamond. No DOM or audio dependencies. */
+export const MAX_ODD_LIMIT = 31;
+export const MAX_NUMBERS = 16;
+export const MAX_HARMONIC = 255;
+export const clamp = (x, min, max) => Math.min(max, Math.max(min, x));
 
-/**
- * Calculate the greatest common divisor of two numbers
- * @param {number} a - First number
- * @param {number} b - Second number
- * @returns {number} The GCD of a and b
- */
-export const gcd = (a, b) => {
-  a = Math.abs(a);
-  b = Math.abs(b);
-  while (b) {
-    [a, b] = [b, a % b];
+function positiveInteger(n) {
+  if (!Number.isSafeInteger(n) || n < 1 || n > MAX_HARMONIC) {
+    throw new RangeError('Use whole numbers from 1 to 255.');
   }
+}
+export function gcd(a, b) {
+  a = Math.abs(a); b = Math.abs(b);
+  while (b) [a, b] = [b, a % b];
   return a;
-};
-
-/**
- * Generate an array of prime numbers up to n (inclusive)
- * @param {number} n - Upper limit
- * @returns {number[]} Array of primes up to n
- */
-export const primesUpTo = (n) => {
-  n = Math.max(2, n | 0);
-  const s = new Array(n + 1).fill(true);
-  s[0] = s[1] = false;
-  for (let p = 2; p * p <= n; p++) {
-    if (s[p]) {
-      for (let k = p * p; k <= n; k += p) {
-        s[k] = false;
-      }
-    }
-  }
-  return [...Array(n + 1).keys()].filter(i => s[i]);
-};
-
-/**
- * Check if a number only contains prime factors from the allowed list
- * @param {number} n - Number to check
- * @param {number[]} allow - List of allowed prime factors
- * @returns {boolean} True if n only contains allowed prime factors
- */
-export const factorAllowed = (n, allow) => {
-  if (n === 1) return true;
-  let m = n;
-  for (const p of allow) {
-    while (m % p === 0) m /= p;
-  }
-  return m === 1;
-};
-
-/**
- * Normalize a float to the range [1, 2)
- * @param {number} r - Number to normalize
- * @returns {number} Normalized value in [1, 2)
- */
-export const normalizeFloat = (r) => {
-  let x = r;
-  while (x >= 2) x /= 2;
-  while (x < 1) x *= 2;
-  return x;
-};
-
-/**
- * Normalize a fraction to be in the first octave
- * @param {number} sn - Numerator
- * @param {number} sd - Denominator
- * @returns {[number, number]} Normalized [numerator, denominator]
- */
-export const normalizeFrac = (sn, sd) => {
-  if (sn === sd) return [1, 1];
-  let n = sn, d = sd;
-  while (n / d >= 2) d *= 2;
-  while (n / d < 1) n *= 2;
+}
+export function reduce(n, d) {
+  positiveInteger(n); positiveInteger(d);
   const g = gcd(n, d);
   return [n / g, d / g];
-};
-
-/**
- * Find the largest prime factor of a number
- * @param {number} n - Number to factorize
- * @returns {number} Largest prime factor
- */
-export const largestPrimeFactor = (n) => {
-  n = Math.abs(n | 0);
-  if (n <= 1) return 1;
-  let maxPrime = 1;
-  while (n % 2 === 0) {
-    maxPrime = 2;
-    n /= 2;
+}
+export function normalizeFrac(n, d) {
+  positiveInteger(n); positiveInteger(d);
+  while (n >= 2 * d) d *= 2;
+  while (n < d) n *= 2;
+  const g = gcd(n, d);
+  return [n / g, d / g];
+}
+export function largestPrimeFactor(n) {
+  positiveInteger(n);
+  let largest = 1;
+  for (let p = 2; p * p <= n; p++) {
+    while (n % p === 0) { largest = p; n /= p; }
   }
-  for (let p = 3; p * p <= n; p += 2) {
-    while (n % p === 0) {
-      maxPrime = p;
-      n /= p;
-    }
+  return Math.max(largest, n);
+}
+export function limitset(limit, prime = '') {
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_ODD_LIMIT || limit % 2 === 0) {
+    throw new RangeError('Choose an odd limit from 1 to 31.');
   }
-  if (n > 2) maxPrime = n;
-  return maxPrime;
-};
-
-/**
- * Generate a set of odd numbers from 1 to L
- * @param {number} L - Upper limit
- * @returns {number[]} Array of odd numbers
- */
-export const oddset = (L) => {
-  const out = [];
-  for (let i = 1; i <= L; i += 2) out.push(i);
-  return out;
-};
-
-/**
- * Generate limit set with optional prime filtering
- * @param {number} L - Odd limit
- * @param {number|string} P - Prime limit (optional)
- * @returns {number[]} Array of numbers in the limit set
- */
-export const limitset = (L, P) => {
-  L = Math.max(1, L | 0);
-  if (L % 2 === 0) L--;
-  const odds = oddset(L);
-  const p = parseInt(P, 10);
-  if (!isFinite(p) || p < 2) return odds;
-  const allow = primesUpTo(p);
-  return odds.filter(n => factorAllowed(n, allow));
-};
-
-/**
- * Parse custom number input (period-separated values)
- * @param {string} text - Input string
- * @returns {number[]} Array of unique numbers
- */
-export const parseCustom = (text) => {
-  const arr = (text || '').split(/[^\d]+/).filter(Boolean).map(x => parseInt(x, 10)).filter(n => Number.isFinite(n) && n > 0);
-  const out = [];
-  const seen = new Set();
-  for (const n of arr) {
-    if (!seen.has(n)) {
-      seen.add(n);
-      out.push(n);
-    }
+  if (prime !== '' && (!Number.isInteger(Number(prime)) || Number(prime) < 2 || Number(prime) > MAX_HARMONIC)) {
+    throw new RangeError('The prime limit must be a whole number from 2 to 255, or blank.');
   }
-  return out;
-};
+  return Array.from({ length: (limit + 1) / 2 }, (_, i) => 2 * i + 1)
+    .filter(n => prime === '' || largestPrimeFactor(n) <= Number(prime));
+}
+export function parseCustom(text) {
+  if (typeof text !== 'string' || text.length > 300 || !/^\s*\d+(?:[\s.,:]+\d+)*\s*$/.test(text)) {
+    throw new RangeError('Enter whole numbers separated by spaces, periods, commas, or colons.');
+  }
+  const numbers = [...new Set(text.trim().split(/[\s.,:]+/).map(Number))];
+  numbers.forEach(positiveInteger);
+  if (numbers.length > MAX_NUMBERS) throw new RangeError('Use at most 16 different numbers.');
+  return numbers;
+}
+export function pitch(n, d, folded, root) {
+  const [num, den] = folded ? normalizeFrac(n, d) : reduce(n, d);
+  const ratio = num / den;
+  return { num, den, key: num + '/' + den, ratio, frequency: root * ratio, cents: 1200 * Math.log2(ratio) };
+}
+export function uniquePitches(numbers, folded, root) {
+  const notes = new Map();
+  for (const d of numbers) for (const n of numbers) {
+    const note = pitch(n, d, folded, root);
+    notes.set(note.key, note);
+  }
+  return [...notes.values()].sort((a, b) => a.ratio - b.ratio);
+}
 
 /**
- * Clamp a value between min and max
- * @param {number} x - Value to clamp
- * @param {number} a - Minimum value
- * @param {number} b - Maximum value
- * @returns {number} Clamped value
+ * Order axis harmonics without changing the set of ratios.
+ * Chordal ordering lifts small harmonics into the 4:5:6:7 register;
+ * higher harmonics then continue in numerical order.
  */
-export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+export function orderNumbers(numbers, layout = 'numerical') {
+  numbers.forEach(positiveInteger);
+  const copy = [...numbers];
+  if (layout === 'numerical') return copy.sort((a, b) => a - b);
+  if (layout === 'tonal') {
+    const tone = n => { const [num, den] = normalizeFrac(n, 1); return num / den; };
+    return copy.sort((a, b) => tone(a) - tone(b) || a - b);
+  }
+  if (layout === 'chordal') {
+    const register = n => { while (n < 4) n *= 2; return n; };
+    return copy.sort((a, b) => register(a) - register(b) || a - b);
+  }
+  throw new RangeError('Choose a numerical, tonal, or chordal layout.');
+}

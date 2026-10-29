@@ -1,464 +1,347 @@
+import { AudioEngine } from './modules/audio.js';
+import { Player } from './modules/player.js';
+import { DiamondView } from './modules/grid.js';
+import { DEFAULTS, readConfig, validateConfig, numbersFor, shareURL } from './modules/config.js';
+import { uniquePitches } from './modules/math.js';
 
-;(function boot(init){
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
-  } else {
-    init();
+const $ = id => document.getElementById(id);
+const STORAGE_KEY = 'tonality-diamond-classic-v2';
+let saved;
+try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* Storage is optional. */ }
+const initial = readConfig(location.search, saved);
+let config = initial.config;
+let numbers = [], pitches = [];
+let sustain = false, shift = false, moving = false, sequenceRunning = false;
+let noticeTimer;
+const pointers = new Map();
+const armed = new Map();
+const view = new DiamondView($('viewport'), $('stage'), $('diamondWrap'));
+view.onZoom = value => { $('zoomPct').textContent = value + '%'; };
+const audio = new AudioEngine({
+  onChange(keys) {
+    view.highlight(keys);
+  },
+  onStatus(message, error) {
+    $('audioBanner').classList.toggle('hidden', !error);
+    $('audioBannerMsg').textContent = message;
   }
-})(function init(){
-  'use strict';
-  
-  // Import modules
-  Promise.all([
-    import('./modules/audio.js'),
-    import('./modules/math.js')
-  ]).then(([audioModule, mathModule]) => {
-    // Initialize audio module and start app
-    initApp(audioModule, mathModule);
-  });
-  
-  function initApp(audioModule, mathModule) {
-    const { 
-      initAudio, ensureAudio, noteOn, noteOff, stopAll, 
-      rtof, isNoteActive, showAudioBanner, hideAudioBanner 
-    } = audioModule;
-    
-    const {
-      gcd, primesUpTo, factorAllowed, normalizeFloat, normalizeFrac,
-      largestPrimeFactor, oddset, limitset, parseCustom, clamp
-    } = mathModule;
-  
-    // ---------- Helpers ----------
-    const hue=(n)=> (n*137+61)%360; 
-    const colorOdd=(n)=> n===1?"#f2f4f8":`hsl(${hue(n)} 75% 60%)`; 
-    const soften=(c)=>{ 
-      const m=c.match(/hsl\(([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\)/); 
-      if(!m) return c; 
-      const h=+m[1], s=+m[2], l=+m[3]; 
-      return `hsl(${h} ${s}% ${Math.min(92,l+22)}%)`; 
-    };
-
-    // Attach build triggers to relevant inputs
-    function attachBuildTriggers() {
-      ['oddLimit', 'primeLimit', 'customNums'].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') build(); });
-        el.addEventListener('blur', build);
-      });
-    }
-    attachBuildTriggers();
-  // --- Prime-base color mapping: prime gets full saturation, composites desaturate progressively ---
-  function colorByPrimeBase(n){
-    if(n===1) return "#f2f4f8"; // special-case unison color
-    const p = largestPrimeFactor(n);
-    const h = (primeHueMap.get(p) ?? hue(p)); // per-grid distinct hues; fallback to golden-angle if missing
-    const k = Math.max(1, Math.round(n / p)); // multiplicative distance from the base prime
-    const s = Math.max(28, Math.min(75, 75 * Math.pow(0.85, k-1))); // progressive desaturation
-    const l = 60; // keep constant lightness; axis tiles are softened separately
-    return `hsl(${h} ${s.toFixed(1)}% ${l}%)`;
-  }
-
-  // ---------- Pitch and ratio calculations ----------
-  function labelMode(){ 
-    return document.querySelector('input[name="labels"]:checked').value;
-  }
-  
-  function ratioFor(sn,sd){ 
-    const r = sn/sd; 
-    return (labelMode()==='norm') ? normalizeFloat(r) : r;
-  }
-  
-  function noteKeyFor(sn,sd){
-    // Key identity should mirror the audible pitch so we don't duplicate the same note
-    if(labelMode()==='norm'){
-      const [n2,d2]=normalizeFrac(sn,sd);
-      return `note-${n2}/${d2}`;
-    }
-    return `note-${sn}/${sd}`;
-  }
-
-  // Initialize audio module
-  initAudio();
-  document.getElementById('panic').addEventListener('click', stopAll);
-
-  // ---------- Build ----------
-  const viewport = document.getElementById('viewport');
-  const wrap = document.getElementById('diamondWrap');
-  const stage = document.getElementById('stage');
-  function clearStage(){ stage.innerHTML=''; stage.style.gridTemplateColumns=''; stage.style.gridTemplateRows=''; }
-  const mode=()=> document.querySelector('input[name="mode"]:checked').value;
-  let currentNums = [];
-  // Map of prime -> hue for the current grid; ensures primes are maximally separated on the wheel
-  let primeHueMap = new Map();
-  function computePrimeHueMap(nums){
-    const bases = new Set();
-    for(const n of nums){ if(n>1) bases.add(largestPrimeFactor(n)); }
-    const primes = Array.from(bases).sort((a,b)=>a-b);
-    const m = Math.max(1, primes.length);
-    const offset = 17; // degrees; small offset so first prime isn't exactly red
-    primeHueMap.clear();
-    for(let i=0;i<primes.length;i++){
-      const h = (offset + i * 360 / m) % 360; // evenly spaced around the hue circle
-      primeHueMap.set(primes[i], h);
-    }
-  }
-
-  function makeLabel(a,b,sn,sd){
-    if(labelMode()==='rows') return `${b}/${a}`;
-    const [n2,d2] = normalizeFrac(sn,sd);
-    return `${n2}/${d2}`;
-  }
-
-  function render(nums){
-    clearStage(); const N=nums.length; if(N<1) return; stage.dataset.n = N; stage.style.gridTemplateColumns = `repeat(${N+1}, var(--cell))`; stage.style.gridTemplateRows = `repeat(${N+1}, var(--cell))`;
-
-    const corner=document.createElement('div'); corner.className='tile axis'; corner.tabIndex=0; const cornerCell=document.createElement('div'); cornerCell.className='cell'; corner.appendChild(cornerCell); stage.appendChild(corner);
-
-    // top axis (columns)
-    for(let j=0;j<N;j++){
-      const t=document.createElement('div'); t.className='tile axis'; t.tabIndex=0;
-      const cell=document.createElement('div'); cell.className='cell';
-      const lab=document.createElement('div'); lab.className='label'; lab.textContent=nums[j];
-      cell.appendChild(lab); t.appendChild(cell);
-      t.style.background=soften(colorByPrimeBase(nums[j]));
-      t.dataset.axis='col'; t.dataset.value=nums[j];
-      stage.appendChild(t);
-    }
-
-    // left axis (rows) + grid
-    for(let i=0;i<N;i++){
-      const at=document.createElement('div'); at.className='tile axis'; at.tabIndex=0;
-      const ac=document.createElement('div'); ac.className='cell';
-      const alab=document.createElement('div'); alab.className='label'; alab.textContent=nums[i];
-      ac.appendChild(alab); at.appendChild(ac);
-      at.style.background=soften(colorByPrimeBase(nums[i]));
-      at.dataset.axis='row'; at.dataset.value=nums[i];
-      stage.appendChild(at);
-
-      for(let j=0;j<N;j++){
-        const a=nums[i], b=nums[j];
-        const g=gcd(a,b); const sn=b/g, sd=a/g; // reduced for pitch
-        const r=sn/sd;
-        const labelText = makeLabel(a,b,sn,sd);
-
-        const tile=document.createElement('div'); tile.className='tile'; tile.dataset.num=sn; tile.dataset.den=sd; tile.dataset.a=a; tile.dataset.b=b;
-        tile.style.setProperty('--numColor', colorByPrimeBase(b));
-        tile.style.setProperty('--denColor', colorByPrimeBase(a));
-
-        const cell=document.createElement('div'); cell.className='cell';
-        const label=document.createElement('div'); label.className='label';
-        const frac=document.createElement('div'); frac.className='frac';
-        const parts = labelText.split('/');
-        const n=document.createElement('div'); n.className='n'; n.textContent=parts[0];
-        const bar=document.createElement('div'); bar.className='bar';
-        const d=document.createElement('div'); d.className='d'; d.textContent=parts[1];
-        frac.appendChild(n); frac.appendChild(bar); frac.appendChild(d);
-        label.appendChild(frac);
-        const tip=document.createElement('div'); tip.className='tip'; const base=ratioFor(sn,sd); const cents=1200*Math.log2(base); tip.textContent=`${labelText} • ${(parseFloat(document.getElementById('refHz').value||'392')*base).toFixed(2)} Hz • ${(cents>=0?'+':'')+cents.toFixed(2)}¢`;
-        cell.appendChild(label);
-        tile.appendChild(cell); stage.appendChild(tile);
-      }
-    }
-    fitToViewport();
-    attachAxisHandlers();
-  }
-
-  // ---------- Layout: fit + zoom (buttons, pinch, ctrl+wheel) ----------
-  let baseScale = 1; let userZoom = 1;
-  function gridSizePx(){ const N = parseInt(stage.dataset.n||'0',10); const cs = getComputedStyle(document.documentElement); const cell = parseFloat(cs.getPropertyValue('--cell')) || 32; const gap = parseFloat(cs.getPropertyValue('--gap')) || 1; const count = N + 1; const width = count*cell + N*gap; return width; }
-  function applyTransform(){ wrap.style.transform = `translate(-50%,-50%) rotate(var(--wrap-rot)) scale(${(baseScale*userZoom).toFixed(5)})`; const zoomPct = Math.round(userZoom*100); document.getElementById('zoomPct').textContent = zoomPct+"%"; }
-  function fitToViewport(){ const size = gridSizePx(); const diag = size * Math.SQRT2; const pad = 24; const availW = viewport.clientWidth - pad; const availH = viewport.clientHeight - pad; baseScale = clamp(Math.min(availW/diag, availH/diag), 0.01, 20); if(!isFinite(baseScale) || baseScale<=0) baseScale = 1; applyTransform(); }
-  window.addEventListener('resize', fitToViewport);
-
-  document.getElementById('zoomIn').addEventListener('click', ()=>{ userZoom = clamp(userZoom*1.15, 0.05, 40); applyTransform(); });
-  document.getElementById('zoomOut').addEventListener('click', ()=>{ userZoom = clamp(userZoom/1.15, 0.05, 40); applyTransform(); });
-  document.getElementById('fit').addEventListener('click', ()=>{ userZoom = 1; fitToViewport(); });
-
-  // Pinch (two-pointer) + Ctrl+Wheel
-  const pinch = { points:new Map(), startDist:0, startZoom:1 };
-  viewport.addEventListener('pointerdown', (e)=>{ if(e.target.closest('#menu')) return; if(e.pointerType!=='touch' && e.pointerType!=='pen') return; viewport.setPointerCapture(e.pointerId); pinch.points.set(e.pointerId, {x:e.clientX, y:e.clientY}); if(pinch.points.size===2){ const [a,b]=[...pinch.points.values()]; pinch.startDist = Math.hypot(b.x-a.x, b.y-a.y); pinch.startZoom = userZoom; } });
-  viewport.addEventListener('pointermove', (e)=>{ if(!pinch.points.has(e.pointerId)) return; pinch.points.set(e.pointerId, {x:e.clientX, y:e.clientY}); if(pinch.points.size===2 && pinch.startDist>0){ const [a,b]=[...pinch.points.values()]; const d = Math.hypot(b.x-a.x, b.y-a.y); userZoom = clamp(pinch.startZoom * (d / pinch.startDist), 0.05, 40); applyTransform(); } });
-  const endPinch=(e)=>{ if(pinch.points.has(e.pointerId)) pinch.points.delete(e.pointerId); if(pinch.points.size<2){ pinch.startDist=0; } };
-  viewport.addEventListener('pointerup', endPinch);
-  viewport.addEventListener('pointercancel', endPinch);
-  viewport.addEventListener('wheel', (e)=>{ if(!e.ctrlKey) return; e.preventDefault(); const factor = Math.exp(-e.deltaY * 0.0015); userZoom = clamp(userZoom * factor, 0.05, 40); applyTransform(); }, {passive:false});
-
-  // ---------- Interaction: Drag-to-play + Shift-sustain ----------
-  const mods = { shift:false };
-  window.addEventListener('keydown', (e)=>{ if(e.key === 'Shift') mods.shift = true; });
-  window.addEventListener('keyup', (e)=>{ if(e.key === 'Shift'){ mods.shift = false; releaseSustained(); }});
-
-  const sustainKeys = new Set();
-  function releaseSustained(){ 
-    for(const key of Array.from(sustainKeys)){ 
-      noteOff(key); 
-      sustainKeys.delete(key); 
-    } 
-    stage.querySelectorAll('.tile.play').forEach(t=>{ 
-      const k=noteKeyFor(+t.dataset.num, +t.dataset.den); 
-      if(!isNoteActive(k)) t.classList.remove('play'); 
-    }); 
-  }
-  window._stopAllSustain = () => releaseSustained();
-
-  const gesture={ active:false, pointerId:null, touched:new Set() };
-  function tileFromPoint(x,y){ let el=document.elementFromPoint(x,y); while(el && el!==stage && !el.classList.contains('tile')) el=el.parentElement; if(el && el.classList.contains('tile') && !el.classList.contains('axis')) return el; return null; }
-  async function triggerTile(tile){ 
-    if(!tile) return; 
-    const sn=+tile.dataset.num, sd=+tile.dataset.den; 
-    const key=noteKeyFor(sn,sd); 
-    if(gesture.touched.has(key)) return; 
-    gesture.touched.add(key); 
-    tile.classList.add('play'); 
-    await noteOn(key, rtof(ratioFor(sn,sd))); 
-    if(mods.shift){ 
-      sustainKeys.add(key); 
-    } else { 
-      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
-      setTimeout(()=>{ 
-        noteOff(key); 
-        if(!isNoteActive(key)) tile.classList.remove('play'); 
-      }, relMs+40); 
-    } 
-  }
-  function endGesture(){ 
-    if(!gesture.active) return; 
-    gesture.active=false; 
-    gesture.pointerId=null; 
-    gesture.touched.clear(); 
-    stage.querySelectorAll('.tile.play').forEach(t=>{ 
-      const k=noteKeyFor(+t.dataset.num, +t.dataset.den); 
-      if(!isNoteActive(k)) t.classList.remove('play'); 
-    }); 
-  }
-  stage.addEventListener('pointerdown', async ev=>{ if(ev.target.closest('.tile.axis')) return; ev.preventDefault(); gesture.active=true; gesture.pointerId=ev.pointerId; gesture.touched.clear(); await triggerTile(tileFromPoint(ev.clientX, ev.clientY)); });
-  window.addEventListener('pointermove', async ev=>{ if(!gesture.active || ev.pointerId!==gesture.pointerId) return; await triggerTile(tileFromPoint(ev.clientX, ev.clientY)); });
-  window.addEventListener('pointerup', ev=>{ if(gesture.active && ev.pointerId===gesture.pointerId) endGesture(); });
-  window.addEventListener('pointercancel', ev=>{ if(gesture.active && ev.pointerId===gesture.pointerId) endGesture(); });
-  viewport.addEventListener('pointerdown', (e)=>{ if(pinch.points.size===1) endGesture(); });
-
-  // ---------- Axis behavior (Shift+click = chord, two-click = arpeggio with 2s arm) ----------
-  const axisClickState = new WeakMap();
-  function collectLineCells(ax){ const val=ax.dataset.value; const isRow=ax.dataset.axis==='row'; const sel=isRow? `.tile[data-a="${val}"]` : `.tile[data-b="${val}"]`; return Array.from(stage.querySelectorAll(sel)); }
-  function uniqueKeysFromCells(cells){ const keys=[]; const seen=new Set(); for(const c of cells){ const k=noteKeyFor(+c.dataset.num, +c.dataset.den); if(!seen.has(k)){ seen.add(k); keys.push(k); } } return keys; }
-  async function playChord(ax, sustain){ 
-    const cells=collectLineCells(ax); 
-    const keys=uniqueKeysFromCells(cells); 
-    await ensureAudio(); 
-    for(const c of cells){ 
-      c.classList.add('play'); 
-    } 
-    await Promise.all(keys.map(async k=>{ 
-      const [sn,sd]=k.replace('note-','').split('/').map(Number); 
-      await noteOn(k, rtof(ratioFor(sn,sd))); 
-    })); 
-    if(sustain){ 
-      keys.forEach(k=>sustainKeys.add(k)); 
-    } else { 
-      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
-      setTimeout(()=> keys.forEach(noteOff), relMs+40); 
-    } 
-  }
-  async function playArpeggio(ax, stepMs){ 
-    const cells=collectLineCells(ax); 
-    const keys=uniqueKeysFromCells(cells); 
-    await ensureAudio(); 
-    cells.forEach(c=>c.classList.add('play')); 
-    let i=0; 
-    const id=setInterval(async ()=>{ 
-      if(i>=keys.length){ 
-        clearInterval(id); 
-        return; 
-      } 
-      const k=keys[i++]; 
-      const [sn,sd]=k.replace('note-','').split('/').map(Number); 
-      await noteOn(k, rtof(ratioFor(sn,sd))); 
-      const relMs=Math.max(10, parseFloat(document.getElementById('release').value||'250')); 
-      setTimeout(()=> noteOff(k), relMs+40); 
-    }, Math.max(40, Math.min(1200, stepMs||120))); 
-  }
-  function attachAxisHandlers(){ stage.querySelectorAll('.tile.axis[data-axis]').forEach(ax=>{ ax.addEventListener('click', async ev=>{ ev.preventDefault(); if(mods.shift){ await playChord(ax, true); return; } let st = axisClickState.get(ax) || {}; if(!st.armTs){ st.armTs = performance.now(); if(st.timer) clearTimeout(st.timer); ax.classList.add('armed'); st.timer = setTimeout(()=>{ axisClickState.set(ax, {}); ax.classList.remove('armed'); }, 2000); axisClickState.set(ax, st); } else { const step = Math.max(40, Math.min(1200, performance.now() - st.armTs)); if(st.timer) clearTimeout(st.timer); axisClickState.set(ax, {}); ax.classList.remove('armed'); await playArpeggio(ax, step); } }); }); }
-
-  // ---------- Orientation ----------
-  const ORIENT_KEY='td-orientation';
-  const rootStyle = document.documentElement.style;
-  function setOrientation(val){ if(val==='v'){ rootStyle.setProperty('--wrap-rot','45deg'); rootStyle.setProperty('--label-rot','-45deg'); }else{ rootStyle.setProperty('--wrap-rot','-45deg'); rootStyle.setProperty('--label-rot','45deg'); } try{ localStorage.setItem(ORIENT_KEY, val); }catch(e){} applyTransform(); }
-  try{ const saved = localStorage.getItem(ORIENT_KEY); if(saved==='v'){ document.getElementById('o-v').checked=true; setOrientation('v'); } else { document.getElementById('o-h').checked=true; setOrientation('h'); } }catch(e){ setOrientation('h'); }
-  document.querySelectorAll('input[name="orient"]').forEach(r=> r.addEventListener('change', (e)=> setOrientation(e.target.value)));
-  window.addEventListener('keydown', (e)=>{ if(e.key && e.key.toLowerCase()==='o'){ const v=document.getElementById('o-v').checked; setOrientation(v? 'h':'v'); document.getElementById(v? 'o-h':'o-v').checked=true; } });
-
-  // ---------- Build controls ----------
-  function build(){
-    const m=mode(); let nums=[];
-    if(m==='limit'){
-      let L=parseInt(document.getElementById('oddLimit').value,10); if(!isFinite(L)) L=1; if(L%2===0) L--; L=Math.max(1,L); const P=document.getElementById('primeLimit').value; nums=limitset(L, P);
-    } else { // custom
-      const raw=document.getElementById('customNums').value.trim(); nums = parseCustom(raw);
-    }
-    currentNums = nums.slice();
-    computePrimeHueMap(currentNums);
-    render(currentNums);
-  }
-    const panels = {
-        limit: document.getElementById('limit-opts'),
-        custom: document.getElementById('custom-opts')
-    };
-
-    function updatePanelVisibility() {
-        const m = mode();
-        for (const k in panels) {
-            panels[k].classList.toggle('hidden', k !== m);
-        }
-    }
-
-    // Attach listeners for mode change
-    document.querySelectorAll('input[name="mode"]').forEach(r =>
-        r.addEventListener('change', () => {
-            updatePanelVisibility();
-            build();
-        })
-    );
-
-    // Ensure correct panel is visible on page load
-    updatePanelVisibility();
-  document.querySelectorAll('input[name="mode"]').forEach(r=> r.addEventListener('change', ()=>{ const m=mode(); for(const k in panels){ panels[k].classList.toggle('hidden', k!==m); } }));
-
-  // Re-render labels only when label mode changes
-  document.querySelectorAll('input[name="labels"]').forEach(r=> r.addEventListener('change', ()=>{ if(currentNums.length) render(currentNums); }));
-
-  // ---------- Optional: lightweight self-tests (opt-in) ----------
-  function runSelfTests(){
-    try{
-      const url = new URL(window.location.href);
-      const on = url.hash.includes('selftest') || url.searchParams.get('selftest')==='1';
-      if(!on) return; // opt-in only
-
-      const assert = (name, cond)=> console[(cond?'log':'error')]((cond?'✓ ':'✗ ')+name);
-      const _noteOn = audioModule.noteOn, _noteOff = audioModule.noteOff; // stub audio for silent tests
-      window.noteOn = async (key)=>{ window.active = window.active || new Map(); window.active.set(key, {o:null,g:null}); };
-      window.noteOff = (key)=>{ if(window.active) window.active.delete(key); };
-
-      // Build: limit mode L=5, P blank
-      document.getElementById('m-limit').checked = true;
-      document.getElementById('oddLimit').value = 5;
-      document.getElementById('primeLimit').value = '';
-      build();
-
-      let cells = Array.from(stage.querySelectorAll('.tile:not(.axis)'));
-      assert('grid renders cells', cells.length>0);
-
-      // Label mode: rows
-      document.getElementById('lbl-rows').checked = true; render(currentNums);
-      cells = Array.from(stage.querySelectorAll('.tile:not(.axis)'));
-      const any = cells[0];
-      const a = +any.dataset.a, b=+any.dataset.b;
-      const txt = any.querySelector('.frac .n').textContent + '/' + any.querySelector('.frac .d').textContent;
-      assert('rows label shows a/b', txt === `${a}/${b}`);
-      // Rows mode: diagonal cells share the same reduced key 1/1
-      const diag = cells.filter(t=> +t.dataset.a === +t.dataset.b);
-      assert('have multiple diagonal cells', diag.length>=2);
-      const k1 = noteKeyFor(+diag[0].dataset.num, +diag[0].dataset.den);
-      const k2 = noteKeyFor(+diag[1].dataset.num, +diag[1].dataset.den);
-      assert('rows mode: diagonal share key note-1/1', k1==='note-1/1' && k1===k2);
-
-      // Label mode: normalized
-      document.getElementById('lbl-norm').checked = true; render(currentNums);
-      cells = Array.from(stage.querySelectorAll('.tile:not(.axis)'));
-      // find a diagonal cell (unison)
-      const unison = cells.find(t=> +t.dataset.a === +t.dataset.b);
-      const utxt = unison.querySelector('.frac .n').textContent + '/' + unison.querySelector('.frac .d').textContent;
-      assert('normalized unison shows 1/1', utxt === '1/1');
-      // Normalization affects key identity for >2 ratios
-      const gt2 = cells.find(t=> (+t.dataset.num)/(+t.dataset.den) >= 2);
-      if(gt2){
-        const sn=+gt2.dataset.num, sd=+gt2.dataset.den;
-        const [nx,dx]=normalizeFrac(sn,sd);
-        const kNorm = noteKeyFor(sn,sd);
-        assert('normalized key equals note-nx/dx', kNorm === `note-${nx}/${dx}`);
-      } else {
-        assert('found a ratio >= 2 cell (for key test)', false);
-      }
-
-      // Color mapping tests: primes share hue with their multiples, and saturation decreases
-      const parseHSL = (s)=>{ try{ const inner=s.slice(s.indexOf('(')+1, s.lastIndexOf(')')); const parts=inner.split(' '); return {h:parseFloat(parts[0]), s:parseFloat(parts[1]), l:parseFloat(parts[2])}; }catch(e){ return null; } };
-      const c3 = parseHSL(colorByPrimeBase(3));
-      const c6 = parseHSL(colorByPrimeBase(6));
-      const c9 = parseHSL(colorByPrimeBase(9));
-      assert('hue(3) == hue(6)', !!c3 && !!c6 && c3.h === c6.h);
-      assert('hue(3) == hue(9)', !!c3 && !!c9 && c3.h === c9.h);
-      assert('saturation 3 > 6 > 9', !!c3 && !!c6 && !!c9 && c3.s > c6.s && c6.s > c9.s);
-
-      // Distinct prime hues within a set (use custom set to include several primes)
-      document.getElementById('m-custom').checked = true;
-      document.getElementById('customNums').value = '3.4.5.6.7.8.9.10.11';
-      build();
-      const primes = [3,5,7,11];
-      const hs = primes.map(p=> { const x=parseHSL(colorByPrimeBase(p)); return x?x.h:NaN; });
-      const circDist=(a,b)=>{ const d=Math.abs(a-b); return Math.min(d, 360-d); };
-      let minSep=999;
-      for(let i=0;i<hs.length;i++) for(let j=i+1;j<hs.length;j++) minSep=Math.min(minSep, circDist(hs[i], hs[j]));
-      assert('prime hues reasonably separated (>=45°)', minSep>=45);
-
-      // cleanup
-      window.noteOn = _noteOn; window.noteOff = _noteOff;
-    }catch(e){ console.error('Self-tests error:', e); }
-  }
-
-  // ---------- Panel Collapse/Expand ----------
-  function setupPanelCollapseButtons() {
-    const MENU_COLLAPSED_KEY = 'td-menu-collapsed';
-    const INSTRUCTIONS_COLLAPSED_KEY = 'td-instructions-collapsed';
-    
-    const menuPanel = document.getElementById('menu');
-    const instructionsPanel = document.getElementById('instructions');
-    
-    // Add click handlers
-    const togglePanel = (panel, storageKey) => {
-      const isCollapsed = panel.classList.toggle('collapsed');
-      const button = panel.querySelector('.btn-collapse');
-      
-      button.textContent = isCollapsed ? '+' : '−';
-      button.title = isCollapsed ? 'Expand panel' : 'Collapse panel';
-      
-      try {
-        localStorage.setItem(storageKey, isCollapsed.toString());
-      } catch(e) {
-        console.warn('Failed to save panel state to localStorage', e);
-      }
-      
-      // Ensure grid remains properly sized after panel change
-      setTimeout(fitToViewport, 200);
-    };
-    
-    menuPanel.querySelector('.btn-collapse').addEventListener('click', () => {
-      togglePanel(menuPanel, MENU_COLLAPSED_KEY);
-    });
-    
-    instructionsPanel.querySelector('.btn-collapse').addEventListener('click', () => {
-      togglePanel(instructionsPanel, INSTRUCTIONS_COLLAPSED_KEY);
-    });
-    
-    // Load saved state (if any) or use defaults
-    try {
-      const menuCollapsed = localStorage.getItem(MENU_COLLAPSED_KEY);
-      if (menuCollapsed === 'false') {
-        togglePanel(menuPanel, MENU_COLLAPSED_KEY); // Expand if previously expanded
-      }
-      
-      const instructionsCollapsed = localStorage.getItem(INSTRUCTIONS_COLLAPSED_KEY);
-      if (instructionsCollapsed === 'false') {
-        togglePanel(instructionsPanel, INSTRUCTIONS_COLLAPSED_KEY); // Expand if previously expanded
-      }
-    } catch(e) {
-      console.warn('Failed to load panel state from localStorage', e);
-    }
-  }
-
-  // Initial render
-  build();
-  setupPanelCollapseButtons();
-  runSelfTests();
-  
-  } // end of initApp function
 });
+const player = new Player(audio, {
+  options: () => ({ wave: config.wave, attack: config.attack, release: config.release }),
+  onSequence(active) {
+    sequenceRunning = active;
+    $('explore').textContent = active ? 'Stop sequence' : 'Play scale';
+  }
+});
+
+
+function notice(message) {
+  clearTimeout(noticeTimer);
+  $('notice').textContent = message; $('notice').hidden = false;
+  noticeTimer = setTimeout(() => { $('notice').hidden = true; }, 4000);
+}
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch { /* Storage is optional. */ }
+  if (new URLSearchParams(location.search).has('diamond')) {
+    try { history.replaceState(null, '', shareURL(location.href, config)); } catch { /* Some embeds restrict history. */ }
+  }
+}
+function clearArmed() {
+  for (const [tile, state] of armed) { clearTimeout(state.timer); tile.classList.remove('armed'); }
+  armed.clear();
+}
+function stop() {
+  player.stop(); pointers.clear(); shift = false; clearArmed(); view.clearFeedback();
+}
+function syncFields() {
+  for (const [id, value] of Object.entries({
+    oddLimit: config.limit, primeLimit: config.prime, customNums: config.custom,
+    refHz: config.root, wave: config.wave, volume: config.volume,
+    attack: config.attack, release: config.release, tempo: config.tempo, axisMode: config.axisMode
+  })) $(id).value = value;
+  for (const [name, value] of [['mode', config.mode], ['labels', config.labels], ['orient', config.orientation]]) {
+    document.querySelectorAll('input[name="' + name + '"]').forEach(r => { r.checked = r.value === value; });
+  }
+  syncRootField();
+  $('folded').checked = config.folded;
+  $('volumeValue').textContent = Math.round(config.volume * 100) + '%';
+  $('tempoValue').textContent = config.tempo + ' BPM';
+  $('tempoControl').hidden = config.axisMode !== 'arpeggio';
+  $('limitFields').hidden = config.mode !== 'limit';
+  $('customFields').hidden = config.mode !== 'custom';
+  $('shapeHint').textContent = config.mode === 'limit' ? 'Odd limits 1–31.' : 'Up to 16 numbers, 1–255. Separate with periods, spaces, commas, or colons.';
+  $('shapeError').hidden = true;
+}
+function render() {
+  numbers = numbersFor(config);
+  pitches = uniquePitches(numbers, config.folded, config.root);
+  view.render(numbers, config);
+  for (const button of $('layoutPresets').children) {
+    button.setAttribute('aria-pressed', String(button.dataset.layout === config.layout));
+  }
+  for (const button of $('presets').children) {
+    button.setAttribute('aria-pressed', String(config.mode === 'limit' && config.limit === +button.dataset.limit && config.prime === ''));
+  }
+}
+function update(patch, rebuild = true) {
+  try {
+    const next = validateConfig({ ...config, ...patch });
+    if (rebuild) stop();
+    config = next; syncFields(); audio.setVolume(config.volume);
+    if (rebuild) render();
+    persist(); return true;
+  } catch (error) {
+    $('shapeError').textContent = error.message; $('shapeError').hidden = false; return false;
+  }
+}
+for (const limit of [5, 7, 11, 13, 15]) {
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'btn ghost small'; button.dataset.limit = limit;
+  button.textContent = limit + '-limit'; button.setAttribute('aria-label', limit + '-limit preset');
+  button.addEventListener('click', () => update({ mode: 'limit', limit, prime: '' }));
+  $('presets').append(button);
+}
+for (const button of $('layoutPresets').children) {
+  button.addEventListener('click', () => update({ layout: button.dataset.layout }));
+}
+document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => update({ mode: r.value })));
+function applyShape(event) {
+  event?.preventDefault();
+  update(config.mode === 'limit' ? { limit: Number($('oddLimit').value), prime: $('primeLimit').value } : { custom: $('customNums').value.trim() });
+}
+$('shapeForm').addEventListener('submit', applyShape);
+for (const id of ['oddLimit', 'primeLimit', 'customNums']) $(id).addEventListener('change', applyShape);
+$('folded').addEventListener('change', () => update({ folded: $('folded').checked }));
+document.querySelectorAll('input[name="labels"]').forEach(r => r.addEventListener('change', () => update({ labels: r.value })));
+document.querySelectorAll('input[name="orient"]').forEach(r => r.addEventListener('change', () => {
+  config.orientation = r.value; view.vertical = r.value === 'vertical'; view.transform(); persist();
+}));
+for (const [id, name] of [['attack', 'attack'], ['release', 'release']]) {
+  $(id).addEventListener('change', () => {
+    if ($(id).reportValidity()) update({ [name]: Number($(id).value) }, false);
+  });
+}
+function sizeRootField() {
+  $('refHz').style.width = Math.max(4, $('refHz').value.length + 0.3) + 'ch';
+}
+function syncRootField() {
+  $('refHz').value = config.root.toFixed(2);
+  sizeRootField();
+}
+$('refHz').addEventListener('input', sizeRootField);
+$('refHz').addEventListener('click', () => $('refHz').select());
+$('refHz').addEventListener('change', () => {
+  if (!$('refHz').checkValidity()) {
+    syncRootField(); notice('Root frequency must be between 20 and 2000 Hz.'); return;
+  }
+  update({ root: Number($('refHz').value) });
+});
+$('refHz').addEventListener('keydown', event => {
+  if (event.key === 'Enter') { event.preventDefault(); $('refHz').blur(); }
+  if (event.key === 'Escape') { syncRootField(); $('refHz').blur(); }
+});
+$('wave').addEventListener('change', () => { stop(); update({ wave: $('wave').value }, false); });
+$('volume').addEventListener('input', () => {
+  config.volume = Number($('volume').value); audio.setVolume(config.volume);
+  $('volumeValue').textContent = Math.round(config.volume * 100) + '%'; persist();
+});
+$('tempo').addEventListener('input', () => {
+  config.tempo = Number($('tempo').value); $('tempoValue').textContent = config.tempo + ' BPM';
+  player.cancelSequence(); persist();
+});
+$('axisMode').addEventListener('change', () => {
+  player.cancelSequence(); clearArmed(); update({ axisMode: $('axisMode').value }, false);
+});
+$('panic').addEventListener('click', stop);
+$('enableAudio').addEventListener('click', () => { void audio.ensure(); });
+$('sustain').addEventListener('click', () => {
+  sustain = !sustain; $('sustain').setAttribute('aria-pressed', String(sustain));
+  if (!sustain) player.releaseHeld('latch');
+  notice(sustain ? 'Sustain on. Tap a held note again to release it.' : 'Sustain off.');
+});
+$('explore').addEventListener('click', () => { if (sequenceRunning) stop(); else player.sequence(pitches, config.tempo); });
+$('resetButton').addEventListener('click', () => {
+  sustain = false; $('sustain').setAttribute('aria-pressed', 'false');
+  moving = false; $('moveMode').checked = false; $('viewport').classList.remove('moving');
+  update({ ...DEFAULTS }); notice('Settings reset.');
+});
+$('zoomIn').addEventListener('click', () => view.setZoom(view.zoom * 1.15));
+$('zoomOut').addEventListener('click', () => view.setZoom(view.zoom / 1.15));
+$('fit').addEventListener('click', () => view.fit());
+$('moveMode').addEventListener('change', () => {
+  stop(); moving = $('moveMode').checked; $('viewport').classList.toggle('moving', moving);
+  notice(moving ? 'Move mode: drag to pan or use two fingers to zoom.' : 'Play mode.');
+});
+$('viewport').addEventListener('wheel', event => {
+  if (!event.ctrlKey || event.target.closest('.panel')) return;
+  event.preventDefault(); view.setZoom(view.zoom * Math.exp(-event.deltaY * 0.0015));
+}, { passive: false });
+
+function kind() { return sustain ? 'latch' : shift ? 'shift' : 'pulse'; }
+function playTile(tile, gesture) {
+  if (!tile || tile.getAttribute('aria-disabled') === 'true') return;
+  const note = view.notes.get(tile);
+  if (!note || gesture?.visited.has(note.key)) return;
+  gesture?.visited.add(note.key); player.play(note, kind());
+}
+function playAxis(tile) {
+  const notes = view.line(tile);
+  if (shift) { player.cancelSequence(); player.chord(notes, 'shift'); return; }
+  if (config.axisMode === 'arpeggio') player.sequence(notes, config.tempo);
+  else if (config.axisMode === 'tap') {
+    const previous = armed.get(tile);
+    if (previous) {
+      const delay = Math.max(40, Math.min(1200, performance.now() - previous.time));
+      clearArmed(); player.sequence(notes, 30000 / delay);
+    } else {
+      clearArmed(); tile.classList.add('armed');
+      const timer = setTimeout(() => { tile.classList.remove('armed'); armed.delete(tile); }, 2000);
+      armed.set(tile, { time: performance.now(), timer });
+      notice('Tap that edge again to set the arpeggio speed.');
+    }
+  } else { player.cancelSequence(); player.chord(notes, kind()); }
+}
+$('viewport').addEventListener('pointerdown', event => {
+  if (event.target.closest('.panel, #audioBanner, .notice') || (event.button !== 0 && event.pointerType === 'mouse')) return;
+  const tile = event.target.closest('.tile');
+  if (!moving && !tile) return;
+  event.preventDefault(); shift = event.shiftKey;
+  const gesture = { x: event.clientX, y: event.clientY, visited: new Set(), tile };
+  pointers.set(event.pointerId, gesture); $('viewport').setPointerCapture(event.pointerId);
+  if (moving) return;
+  view.press(event.pointerId, tile);
+  if (tile?.classList.contains('axis') && !tile.classList.contains('corner')) playAxis(tile);
+  else playTile(tile, gesture);
+});
+$('viewport').addEventListener('pointermove', event => {
+  const target = moving ? null : view.tileAt(event.clientX, event.clientY);
+  if (event.pointerType !== 'touch') view.hover(target);
+  if (pointers.has(event.pointerId) && !moving) view.press(event.pointerId, target);
+  const gesture = pointers.get(event.pointerId);
+  if (!gesture) return;
+  const oldX = gesture.x, oldY = gesture.y, pairBefore = [...pointers.values()];
+  const before = pairBefore.length === 2 ? Math.hypot(pairBefore[0].x - pairBefore[1].x, pairBefore[0].y - pairBefore[1].y) : 0;
+  gesture.x = event.clientX; gesture.y = event.clientY;
+  if (moving) {
+    const pair = [...pointers.values()];
+    if (pair.length === 2 && before > 0) {
+      view.setZoom(view.zoom * Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y) / before);
+    } else view.move(view.pan.x + gesture.x - oldX, view.pan.y + gesture.y - oldY);
+  } else if (!gesture.tile?.classList.contains('axis')) playTile(view.tileAt(event.clientX, event.clientY), gesture);
+});
+$('viewport').addEventListener('pointerleave', () => view.hover(null));
+const endPointer = event => { pointers.delete(event.pointerId); view.press(event.pointerId, null); };
+$('viewport').addEventListener('pointerup', endPointer);
+$('viewport').addEventListener('pointercancel', () => stop());
+$('viewport').addEventListener('lostpointercapture', endPointer);
+$('stage').addEventListener('click', event => {
+  if (event.detail !== 0 || moving) return;
+  const tile = event.target.closest('.tile');
+  if (tile?.classList.contains('axis') && !tile.classList.contains('corner')) playAxis(tile);
+  else playTile(tile);
+});
+$('stage').addEventListener('keyup', event => {
+  if (event.key === 'Enter' || event.key === ' ') view.press('keyboard', null);
+});
+$('stage').addEventListener('focusout', () => view.press('keyboard', null));
+$('stage').addEventListener('keydown', event => {
+  if (!moving && (event.key === 'Enter' || event.key === ' ')) view.press('keyboard', event.target.closest('.tile'));
+  const delta = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[event.key];
+  const tile = event.target.closest('.tile');
+  if (!delta || !tile) return;
+  event.preventDefault();
+  $('stage').querySelector('button[data-row="' + (+tile.dataset.row + delta[0]) + '"][data-col="' + (+tile.dataset.col + delta[1]) + '"]')?.focus();
+});
+const editing = target => target instanceof Element && (target.matches('input, select, textarea') || target.isContentEditable);
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { stop(); closeCornerMenus(true); return; }
+  if (event.key === 'Shift') { shift = true; return; }
+  if (editing(event.target) || $('shareDialog').open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!event.repeat && event.key.toLowerCase() === 'o') {
+    config.orientation = config.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+    syncFields(); view.vertical = config.orientation === 'vertical'; view.transform(); persist();
+  }
+});
+window.addEventListener('keyup', event => { if (event.key === 'Shift') { shift = false; player.releaseHeld('shift'); } });
+window.addEventListener('blur', stop);
+document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+window.addEventListener('pagehide', stop);
+
+
+function selectMenuTab(tab) {
+  const tabs = [...document.querySelectorAll('.menu-tabs [role="tab"]')];
+  tabs.forEach(button => {
+    const selected = button === tab;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    $(button.getAttribute('aria-controls')).hidden = !selected;
+  });
+  document.querySelector('.menu-body').scrollTop = 0;
+}
+const menuTabs = [...document.querySelectorAll('.menu-tabs [role="tab"]')];
+menuTabs.forEach((tab, index) => {
+  tab.addEventListener('click', () => selectMenuTab(tab));
+  tab.addEventListener('keydown', event => {
+    const next = event.key === 'ArrowRight' ? (index + 1) % menuTabs.length
+      : event.key === 'ArrowLeft' ? (index + menuTabs.length - 1) % menuTabs.length
+      : event.key === 'Home' ? 0 : event.key === 'End' ? menuTabs.length - 1 : null;
+    if (next === null) return;
+    event.preventDefault(); selectMenuTab(menuTabs[next]); menuTabs[next].focus();
+  });
+});
+
+const cornerMenus = [
+  ['menuToggle', 'menuContent', 'menu'],
+  ['soundToggle', 'soundContent', 'playbar'],
+  ['helpToggle', 'helpContent', 'helpMenu']
+];
+function closeCornerMenus(returnFocus = false) {
+  for (const [toggleId, contentId, panelId] of cornerMenus) {
+    if (returnFocus && $(contentId).contains(document.activeElement)) $(toggleId).focus();
+    $(toggleId).setAttribute('aria-expanded', 'false');
+    const indicator = $(toggleId).querySelector('.btn-collapse');
+    if (indicator) indicator.textContent = '+';
+    $(contentId).hidden = true;
+    $(panelId).classList.add('collapsed');
+  }
+}
+for (const [toggleId, contentId, panelId] of cornerMenus) {
+  $(toggleId).addEventListener('click', () => {
+    const open = $(contentId).hidden;
+    closeCornerMenus();
+    if (!open) return;
+    $(toggleId).setAttribute('aria-expanded', 'true');
+    const indicator = $(toggleId).querySelector('.btn-collapse');
+    if (indicator) indicator.textContent = '−';
+    $(contentId).hidden = false;
+    $(panelId).classList.remove('collapsed');
+  });
+}
+document.addEventListener('pointerdown', event => {
+  for (const [, contentId, panelId] of cornerMenus) {
+    if (!$(contentId).hidden && !$(panelId).contains(event.target)) { closeCornerMenus(); break; }
+  }
+});
+$('shareButton').addEventListener('click', async () => {
+  const link = shareURL(location.href, config);
+  try { await navigator.clipboard.writeText(link); notice('Setup link copied.'); }
+  catch {
+    stop(); $('shareURL').value = link; $('shareDialog').showModal();
+    $('shareURL').focus(); $('shareURL').select();
+  }
+});
+$('closeShare').addEventListener('click', () => $('shareDialog').close());
+function syncThemeToggle() {
+  const label = document.documentElement.dataset.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  $('themeToggle').setAttribute('aria-label', label);
+  $('themeToggle').title = label;
+}
+$('themeToggle').addEventListener('click', () => {
+  const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('tonality-diamond-theme', theme); } catch { /* Storage is optional. */ }
+  syncThemeToggle();
+});
+syncThemeToggle();
+syncFields(); audio.setVolume(config.volume); render();
+if (initial.warning) notice(initial.warning);

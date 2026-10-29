@@ -1,232 +1,149 @@
-/**
- * Audio engine module for Tonality Diamond Applet
- * Handles AudioContext setup, sound generation, and audio state management
- */
-
-// Module state
-let actx = null;
-let master = null;
-let compressor = null;
-const active = new Map();
-
-// DOM elements
-let audioBanner;
-let audioBannerMsg;
-let enableAudioBtn;
-
-/**
- * Initialize the audio module
- */
-export function initAudio() {
-  audioBanner = document.getElementById('audioBanner');
-  audioBannerMsg = document.getElementById('audioBannerMsg');
-  enableAudioBtn = document.getElementById('enableAudio');
-  
-  // Attach audio event listeners
-  const gestureResume = () => { 
-    if (!actx || actx.state !== 'running') {
-      ensureAudio();
-    }
-  };
-
-  // Volume slider
-  const volumeSlider = document.getElementById('volume');
-  if (volumeSlider) {
-    volumeSlider.addEventListener('input', (e) => {
-      if (master) master.gain.value = parseFloat(e.target.value);
+/** Each note owns its envelope and cancellation token, including while audio wakes up. */
+export class AudioEngine {
+  constructor({ contextFactory, onChange = () => {}, onStatus = () => {} } = {}) {
+    this.contextFactory = contextFactory || (() => {
+      const Context = globalThis.AudioContext || globalThis.webkitAudioContext;
+      if (!Context) throw new Error('Web Audio is unavailable.');
+      return new Context();
     });
+    this.onChange = onChange;
+    this.onStatus = onStatus;
+    this.context = null;
+    this.master = null;
+    this.warmWave = null;
+    this.volume = 0.25;
+    this.voices = new Map();
+    this.fading = new Set();
+    this.nextId = 0;
+    this.resumePromise = null;
   }
-  
-  document.addEventListener('pointerdown', gestureResume, true);
-  document.addEventListener('keydown', gestureResume, true);
-  
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      stopAll();
-    } else {
-      if (!actx || actx.state !== 'running')
-        showAudioBanner('Audio disabled — tap anywhere or click Enable.');
-    }
-  });
-  
-  enableAudioBtn.addEventListener('click', () => {
-    ensureAudio();
-  });
-}
-
-/**
- * Show audio banner with optional message
- */
-export function showAudioBanner(msg) {
-  if (msg) audioBannerMsg.textContent = msg;
-  audioBanner.classList.remove('hidden');
-}
-
-/**
- * Hide audio banner
- */
-export function hideAudioBanner() {
-  audioBanner.classList.add('hidden');
-}
-
-/**
- * Check if parameter has setTargetAtTime method
- */
-function hasTarget(param) {
-  return param && typeof param.setTargetAtTime === "function";
-}
-
-/**
- * Ensure audio context is initialized and running
- */
-export async function ensureAudio() {
-  const Ctor = window.AudioContext || window.webkitAudioContext;
-  if (!Ctor) {
-    showAudioBanner('Audio not supported in this browser.');
-    return null;
-  }
-
-  if (!actx) {
+  async ensure() {
     try {
-      actx = new Ctor();
-    } catch (err) {
-      console.error('AudioContext creation failed', err);
-      showAudioBanner('Audio failed to initialize.');
-      return null;
-    }
-
-    try {
-      master = actx.createGain();
-      master.gain.value = 0.18;
-
-      // Create and configure compressor/limiter
-      compressor = actx.createDynamicsCompressor();
-      compressor.threshold.value = -3;    // dB, start limiting just below 0
-      compressor.knee.value = 0;          // Hard knee for limiter behavior
-      compressor.ratio.value = 20;        // High ratio for limiting
-      compressor.attack.value = 0.003;    // Fast attack
-      compressor.release.value = 0.250;   // Reasonable release
-
-      master.connect(compressor);
-      compressor.connect(actx.destination);
-
-      // Dummy nodes to prime audio context
-      const o = actx.createOscillator();
-      const g = actx.createGain();
-      g.gain.value = 0;
-      o.connect(g);
-      g.connect(master);
-      o.start();
-      o.stop(actx.currentTime);
-    } catch (err) {
-      console.error('Audio node graph failed', err);
-      showAudioBanner('Audio failed to initialize.');
-      return null;
-    }
-
-    actx.onstatechange = () => {
-      if (actx.state === 'running') hideAudioBanner();
-      else showAudioBanner('Audio disabled — tap anywhere or click Enable.');
-    };
-  }
-
-  if (actx.state === 'suspended') {
-    try {
-      await actx.resume();
-    } catch (e) {
-      /* user gesture required */
+      if (!this.context) {
+        const ctx = this.contextFactory();
+        this.context = ctx;
+        this.master = ctx.createGain();
+        this.master.gain.value = this.volume * 0.55;
+        // Harmonic partials only: no detuning or chorus to blur the JI relationships.
+        this.warmWave = ctx.createPeriodicWave(new Float32Array(6), new Float32Array([0, 1, 0.18, 0.065, 0.025, 0.01]));
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -16;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.012;
+        compressor.release.value = 0.3;
+        this.master.connect(compressor);
+        compressor.connect(ctx.destination);
+      }
+      if (this.context.state !== 'running') {
+        this.resumePromise ||= this.context.resume().finally(() => { this.resumePromise = null; });
+        await this.resumePromise;
+      }
+      if (this.context.state !== 'running') throw new Error('Audio needs a tap to start.');
+      this.onStatus('Audio ready', false);
+      return true;
+    } catch {
+      this.onStatus('Audio paused. Tap a note to enable sound.', true);
+      return false;
     }
   }
-  
-  if (actx.state !== 'running')
-    showAudioBanner('Audio disabled — tap anywhere or click Enable.');
-  else
-    hideAudioBanner();
-    
-  return actx;
-}
-
-/**
- * Convert ratio to frequency
- */
-export function rtof(r) {
-  const ref = parseFloat(document.getElementById('refHz').value || '392');
-  return ref * r;
-}
-
-/**
- * Start playing a note
- */
-export async function noteOn(key, f) {
-  await ensureAudio();
-  if (!actx) return;
-  if (active.has(key)) return;
-
-  const o = actx.createOscillator();
-  const g = actx.createGain();
-
-  o.type = document.getElementById('wave').value;
-  o.frequency.value = f;
-
-  g.gain.value = 0.0001;
-  o.connect(g);
-  g.connect(master);
-
-  const att = Math.max(0, parseFloat(document.getElementById('attack').value || '5')) / 1000;
-  const rel = Math.max(0.01, parseFloat(document.getElementById('release').value || '250')) / 1000;
-  const now = actx.currentTime;
-
-  // Smooth attack
-  g.gain.setValueAtTime(0.0001, now);
-  g.gain.linearRampToValueAtTime(1.0, now + att);
-
-  o.start();
-  active.set(key, { o, g, rel });
-  hideAudioBanner();
-}
-
-export function noteOff(key) {
-  const s = active.get(key);
-  if (!s) return;
-
-  const now = actx.currentTime;
-  const rel = Math.max(0.05, s.rel || 0.25); // Ensure minimum release
-
-  // Smooth release
-  s.g.gain.cancelScheduledValues(now);
-  s.g.gain.setValueAtTime(s.g.gain.value, now);
-  s.g.gain.linearRampToValueAtTime(0.00001, now + rel);
-
-  // Stop oscillator after release
-  s.o.stop(now + rel);
-
-  // Disconnect nodes after oscillator stops
-  s.o.onended = () => {
-    s.o.disconnect();
-    s.g.disconnect();
-  };
-
-  active.delete(key);
-}
-
-/**
- * Stop all playing notes
- */
-export function stopAll() {
-  for (const k of Array.from(active.keys())) noteOff(k);
-  if (window._stopAllSustain) window._stopAllSustain();
-}
-
-/**
- * Check if a note is currently active
- */
-export function isNoteActive(key) {
-  return active.has(key);
-}
-
-/**
- * Get the count of currently active notes
- */
-export function getActiveNoteCount() {
-  return active.size;
+  hasVoice(id) { return this.voices.has(id); }
+  setVolume(value) {
+    this.volume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0.25));
+    this.balance();
+  }
+  balance() {
+    if (!this.master) return;
+    const count = [...this.voices.values()].filter(v => v.oscillator).length + this.fading.size;
+    const target = this.volume * 0.55 / Math.pow(Math.max(1, count), 0.65);
+    this.master.gain.setTargetAtTime(target, this.context.currentTime, 0.03);
+  }
+  notify() {
+    const keys = new Set([...this.voices.values()].filter(v => v.oscillator).map(v => v.key));
+    this.balance();
+    this.onChange(keys);
+  }
+  play(key, frequency, options = {}) {
+    if (!Number.isFinite(frequency) || frequency < 20 || frequency > 16000) return null;
+    if (this.voices.size >= 32) this.release(this.voices.keys().next().value, true);
+    const id = ++this.nextId;
+    this.voices.set(id, { key, frequency, options, timer: null });
+    void this.start(id);
+    return id;
+  }
+  async start(id) {
+    const ready = await this.ensure();
+    const voice = this.voices.get(id);
+    if (!voice) return; // Stop, keyup, or a new grid may have cancelled a pending start.
+    if (!ready) { this.voices.delete(id); this.notify(); return; }
+    try {
+      const ctx = this.context;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      Object.assign(voice, { oscillator, gain, started: ctx.currentTime });
+      const warm = !voice.options.wave || voice.options.wave === 'warm';
+      voice.attack = Math.max(0.001, Math.min(1, (voice.options.attack ?? 60) / 1000));
+      voice.peak = 0.65 * (warm ? Math.min(1, Math.pow(900 / voice.frequency, 0.6)) : 1);
+      if (warm) {
+        oscillator.setPeriodicWave(this.warmWave);
+        voice.filter = ctx.createBiquadFilter();
+        voice.filter.type = 'lowpass';
+        voice.filter.frequency.value = Math.min(2800, Math.max(900, voice.frequency * 3));
+        voice.filter.Q.value = 0.5;
+      } else oscillator.type = ['sine', 'triangle', 'square', 'sawtooth'].includes(voice.options.wave) ? voice.options.wave : 'sine';
+      oscillator.frequency.value = voice.frequency;
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(voice.peak, ctx.currentTime + voice.attack);
+      if (voice.filter) { oscillator.connect(voice.filter); voice.filter.connect(gain); }
+      else oscillator.connect(gain);
+      gain.connect(this.master);
+      oscillator.onended = () => {
+        oscillator.disconnect(); voice.filter?.disconnect(); gain.disconnect(); this.fading.delete(voice); this.balance();
+      };
+      oscillator.start();
+      if (Number.isFinite(voice.options.duration)) {
+        voice.timer = setTimeout(() => this.release(id), voice.options.duration);
+      }
+      this.notify();
+    } catch {
+      this.release(id, true);
+      this.onStatus('This note could not be played. Try again.', true);
+    }
+  }
+  release(id, fast = false) {
+    const voice = this.voices.get(id);
+    if (!voice) return;
+    clearTimeout(voice.timer);
+    this.voices.delete(id);
+    if (voice.oscillator) {
+      const now = this.context.currentTime;
+      const gain = voice.gain.gain;
+      const release = fast ? 0.025 : Math.max(0.03, Math.min(3, (voice.options.release ?? 900) / 1000));
+      if (typeof gain.cancelAndHoldAtTime === 'function') {
+        gain.cancelAndHoldAtTime(now);
+      } else {
+        // The only scheduled segment before release is our linear attack.
+        const current = voice.peak * Math.min(1, Math.max(0, (now - voice.started) / voice.attack));
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(current, now);
+      }
+      gain.setTargetAtTime(0, now, release / 5);
+      gain.setValueAtTime(0, now + release);
+      voice.oscillator.stop(now + release + 0.01);
+      this.fading.add(voice);
+    }
+    this.notify();
+  }
+  stopAll() {
+    for (const id of [...this.voices.keys()]) this.release(id, true);
+    // Also cut long release tails from notes that have already been released.
+    for (const voice of this.fading) {
+      const now = this.context.currentTime;
+      const gain = voice.gain.gain;
+      if (typeof gain.cancelAndHoldAtTime === 'function') gain.cancelAndHoldAtTime(now);
+      else { gain.cancelScheduledValues(now); gain.setValueAtTime(gain.value, now); }
+      gain.linearRampToValueAtTime(0, now + 0.025);
+      voice.oscillator.stop(now + 0.035);
+    }
+  }
 }

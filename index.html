@@ -1,106 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Exploring Tonality Diamonds</title>
+<link rel="icon" href="data:,">
+<script src="js/theme.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="viewport">
-    <!-- Floating menu (top-left) -->
-    <div id="menu" class="panel collapsed" aria-label="Controls">
-      <div class="panel-header">
-        <button class="btn-collapse" aria-label="Toggle menu visibility" title="Expand panel">+</button>
-        <h3>Controls</h3>
-      </div>
-      <div id="menuContent">
-        <div class="row">
-          <fieldset>
-            <legend>Diamond</legend>
-            <div class="controls">
-              <label class="inline"><input type="radio" name="mode" id="m-limit" value="limit" checked> Limit</label>
-              <label class="inline"><input type="radio" name="mode" id="m-custom" value="custom"> Custom</label>
-              <div id="limit-opts">
-                <label>Odd-limit</label>
-                <input type="number" id="oddLimit" min="1" step="2" value="5" aria-label="Odd-Limit">
-                <br>
-                <label>Prime-limit (optional)</label>
-                <input type="number" id="primeLimit" min="2" step="1" placeholder="optional" aria-label="Prime-Limit">
-              </div>
-              <div id="custom-opts" class="hidden">
-                <label>Numbers (period-separated, any order)</label>
-                <input type="text" id="customNums" value="4.5.6.7.9.11">
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Labels</legend>
-            <div class="inline" role="radiogroup" aria-label="Label mode">
-              <label class="inline"><input type="radio" name="labels" id="lbl-rows" value="rows" checked> Rows (a/b)</label>
-              <label class="inline"><input type="radio" name="labels" id="lbl-norm" value="norm"> Octave Reduced</label>
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Zoom</legend>
-            <div class="inline">
-              <button id="zoomOut" class="btn ghost" title="Zoom out">−</button>
-              <button id="zoomIn" class="btn ghost" title="Zoom in">+</button>
-              <button id="fit" class="btn secondary" title="Fit to screen">Fit</button>
-              <span id="zoomPct" class="muted" style="min-width:56px; text-align:right;">100%</span>
-            </div>
-            <div class="muted" style="margin-top:4px;">Pinch (touch/pen) or Ctrl+Scroll to zoom</div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Orientation</legend>
-            <div class="inline" role="radiogroup" aria-label="Unison orientation">
-              <label class="inline"><input type="radio" name="orient" id="o-h" value="h" checked> Horizontal</label>
-              <label class="inline"><input type="radio" name="orient" id="o-v" value="v"> Vertical</label>
-            </div>
-            <div class="muted">Flip the unison axis left↔right vs up↕down. (Shortcut: O)</div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Audio</legend>
-            <div class="controls">
-              <div><label>1/1 (Hz)</label><input type="number" id="refHz" min="20" max="2000" step="1" value="392" style="width:110px;"></div>
-              <div><label>Wave</label><select id="wave" style="width:130px;"><option value="sine">sine</option><option value="triangle" selected>triangle</option><option value="square">square</option><option value="sawtooth">sawtooth</option></select></div>
-              <div><label>Volume</label><input type="range" id="volume" min="0" max="1" step="0.01" value="0.18"></div>
-              <div><label>Attack / Release (ms)</label><div class="inline"><input id="attack" type="number" value="5" min="0" step="1" style="width:80px;"><span class="muted">/</span><input id="release" type="number" value="250" min="10" step="10" style="width:90px;"></div></div>
-              <button id="panic" class="btn danger" style="margin-top:6px;">Panic (stop all)</button>
-            </div>
-          </fieldset>
-
+    <section id="menu" class="panel collapsed" aria-label="Diamond controls">
+      <div id="quickControls" class="quick-controls">
+        <div id="presets" class="preset-options" aria-label="Odd limit presets"></div>
+        <div id="layoutPresets" class="layout-options" aria-label="Layout presets">
+          <button type="button" class="btn ghost small" data-layout="numerical" aria-pressed="true" title="Meyer-style: ascending harmonic numbers">Numerically</button>
+          <button type="button" class="btn ghost small" data-layout="tonal" aria-pressed="false" title="Partch-style: ascending pitch within one octave">Tonally</button>
+          <button type="button" class="btn ghost small" data-layout="chordal" aria-pressed="false" title="Diamond Marimba: 1, 5, 3, 7, 9, 11">Chordally</button>
         </div>
       </div>
-    </div>
-    <div id="instructions" class="panel collapsed" style="position:absolute; top:14px; right:14px; z-index:50;">
-      <div class="panel-header">
-        <h3>Instructions</h3>
-        <button class="btn-collapse" aria-label="Toggle instructions visibility" title="Expand panel">+</button>
+      <button id="menuToggle" class="panel-header advanced-toggle" aria-expanded="false" aria-controls="menuContent"><span>Advanced diamond options</span><span class="btn-collapse" aria-hidden="true">+</span></button>
+      <div id="menuContent" class="corner-popup" hidden>
+        <div class="menu-tabs" role="tablist" aria-label="Control categories">
+          <button id="tab-diamond" role="tab" aria-selected="true" aria-controls="settings-diamond" tabindex="0">Diamond</button>
+          <button id="tab-view" role="tab" aria-selected="false" aria-controls="settings-view" tabindex="-1">View</button>
+        </div>
+        <div class="menu-body">
+          <div id="settings-diamond" role="tabpanel" aria-labelledby="tab-diamond">
+<section class="setting-block">
+              <div class="segmented mode-options">
+                <label><input type="radio" name="mode" value="limit" checked><span>Limit</span></label>
+                <label><input type="radio" name="mode" value="custom"><span>Custom</span></label>
+              </div>
+              <form id="shapeForm" novalidate>
+                <div id="limitFields" class="field-pair">
+                  <div><label for="oddLimit">Odd limit</label><input type="number" id="oddLimit" min="1" max="31" step="2" value="5" required></div>
+                  <div><label for="primeLimit">Prime limit <span class="optional">optional</span></label><input type="number" id="primeLimit" min="2" max="255" step="1" placeholder="Any"></div>
+                </div>
+                <div id="customFields" hidden><label for="customNums">Numbers (any order)</label><input type="text" id="customNums" value="4.5.6.7.9.11" maxlength="300" aria-describedby="shapeHint shapeError"></div>
+                <div class="shape-actions"><p id="shapeHint" class="muted">Odd limits 1–31.</p><button class="btn small" type="submit">Apply</button></div>
+                <p id="shapeError" class="error" role="alert" hidden></p>
+              </form>
+            </section>
+            <section class="setting-block">
+              <h3>Ratio display</h3>
+              <div class="segmented">
+                <label><input type="radio" name="labels" value="source" checked><span>Rows (a/b)</span></label>
+                <label><input type="radio" name="labels" value="pitch"><span>Sounding ratio</span></label>
+              </div>
+              <label class="check-row"><input id="folded" type="checkbox"><span>Reduce pitches to one octave</span></label>
+            </section>
+          </div>
+          <div id="settings-view" role="tabpanel" aria-labelledby="tab-view" hidden>
+            <section class="setting-block">
+              <h3>Zoom</h3>
+              <div class="zoom-row">
+                <button id="zoomOut" class="btn ghost" aria-label="Zoom out">−</button><span id="zoomPct">100%</span><button id="zoomIn" class="btn ghost" aria-label="Zoom in">+</button><button id="fit" class="btn secondary">Fit</button>
+              </div>
+              <label class="check-row"><input id="moveMode" type="checkbox"><span>Move / pinch to zoom</span></label>
+              <p class="muted">Turn off to play. Ctrl + scroll also zooms.</p>
+            </section>
+            <section class="setting-block">
+              <h3>Unison axis</h3>
+              <div class="segmented">
+                <label><input type="radio" name="orient" value="horizontal" checked><span>Horizontal</span></label>
+                <label><input type="radio" name="orient" value="vertical"><span>Vertical</span></label>
+              </div>
+              <p class="muted">Keyboard shortcut: <kbd>O</kbd></p>
+            </section>
+          </div>
+        </div>
+        <div class="menu-footer"><button id="resetButton" class="text-button">Reset settings</button><button id="shareButton" class="btn secondary small">Copy setup link</button></div>
       </div>
-      <div id="instructionsContent">
-        <fieldset>
-          <legend>Instructions</legend>
-          <ul>
-            <li>Hold shift to sustain notes</li>
-            <li>Hold shift and click the prime box to play the entire row as a chord</li>
-            <li>click the prime box twice to arpeggiate at the speed of the clicks</li>
-          </ul>
-        </fieldset>
-      </div>
-    </div>
-    <!-- center diamond -->
-    <div id="diamondWrap"><div id="stage" class="stage"></div></div>
-        <!-- audio banner (hidden by default) -->
-    <div id="audioBanner" class="hidden" role="status" aria-live="polite">
-      <span class="msg" id="audioBannerMsg">Audio disabled — tap anywhere or click Enable.</span>
+    </section>
+    <div id="diamondWrap"><div id="stage" class="stage" role="group" aria-label="Playable ratios" tabindex="-1"></div></div>
+    <div id="audioBanner" class="hidden" role="status">
+      <span id="audioBannerMsg">Audio paused. Tap a note to enable sound.</span>
       <button id="enableAudio" class="btn small">Enable</button>
     </div>
+    <section id="playbar" class="panel corner" aria-label="Sound controls">
+      <div class="sound-primary">
+      <div class="quick-volume"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1" step="0.01" value="0.18"><output id="volumeValue" for="volume">18%</output></div>
+        <button id="panic" class="btn danger">Stop all</button>
+      </div>
+      <div class="inline">
+        <button id="sustain" class="btn secondary" aria-pressed="false">Sustain</button>
+        <button id="explore" class="btn secondary">Play scale</button>
+        <label class="root-frequency" title="Root frequency — click to edit"><input type="number" id="refHz" aria-label="Root frequency in hertz" min="20" max="2000" step="any" value="392.00" required><span>Hz</span></label>
+      </div>
+      <button id="soundToggle" class="corner-toggle" aria-expanded="false" aria-controls="soundContent"><span>Advanced sound options</span><span class="btn-collapse" aria-hidden="true">+</span></button>
+      <div id="soundContent" class="corner-popup menu-body" hidden>
+          <div id="settings-sound">
+            <section class="setting-block">
+              <div class="field-pair">
+                <div><label for="wave">Wave</label><select id="wave"><option value="warm" selected>Warm</option><option value="sine">sine</option><option value="triangle">triangle</option><option value="square">square</option><option value="sawtooth">sawtooth</option></select></div>
+              </div>
+              <details class="envelope"><summary>Attack &amp; release</summary><div class="field-pair">
+                <div><label for="attack">Attack (ms)</label><input id="attack" type="number" value="60" min="1" max="1000" required></div>
+                <div><label for="release">Release (ms)</label><input id="release" type="number" value="900" min="30" max="3000" required></div>
+              </div></details>
+            </section>
+            <section class="setting-block">
+              <label for="axisMode">Play a row or column as</label>
+              <select id="axisMode"><option value="chord">Chord</option><option value="arpeggio">Arpeggio</option><option value="tap">Arpeggio (tap timing)</option></select>
+              <div id="tempoControl" hidden><label class="range-heading" for="tempo">Tempo <output id="tempoValue">96 BPM</output></label><input id="tempo" type="range" min="30" max="240" value="96"></div>
+              <p class="muted">Shift + an edge number holds the whole chord.</p>
+            </section>
+          </div>
+      </div>
+    </section>
+    <section id="helpMenu" class="panel corner corner-links" aria-label="Help and project links">
+      <button id="helpToggle" class="corner-toggle" type="button" aria-label="Help" title="Help" aria-expanded="false" aria-controls="helpContent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/></svg></button>
+      <button id="themeToggle" class="corner-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><defs><mask id="moon-crescent"><rect width="24" height="24" fill="white"/><circle cx="15.8" cy="9.8" r="10" fill="black"/></mask></defs><circle cx="12" cy="12" r="10" fill="currentColor" mask="url(#moon-crescent)"/></svg>
+      </button>
+      <div id="helpContent" class="corner-popup menu-body" hidden>
+          <div id="settings-help">
+        <section class="help-section"><h3>Play notes</h3><p>Click, touch, or drag across tiles. Several fingers can play at once.</p></section>
+        <section class="help-section"><h3>Hold a chord</h3><p>Hold <kbd>Shift</kbd> while playing, or use <strong>Sustain</strong>. With Sustain on, tap a held note again to release it.</p></section>
+        <section class="help-section"><h3>Explore a row</h3><p>Click an edge number. Choose chords, arpeggios, or two-click tap timing under <strong>Advanced sound options</strong>.</p></section>
+        <section class="help-section"><h3>Keyboard</h3><dl class="shortcut-list"><div><dt><kbd>Esc</kbd></dt><dd>Stop all sound</dd></div><div><dt><kbd>O</kbd></dt><dd>Rotate diamond</dd></div><div><dt><kbd>Tab</kbd> / arrows</dt><dd>Move between tiles</dd></div><div><dt><kbd>Enter</kbd> / <kbd>Space</kbd></dt><dd>Play the focused tile</dd></div></dl></section>
+          </div>
+      </div>
+      <div class="community-icons project-links">
+        <a href="https://github.com/NickVuci/TonalityDiamondApplet" target="_blank" rel="noopener noreferrer" aria-label="GitHub source (opens in a new tab)" title="GitHub source"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="currentColor" stroke="none" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.09c-3.12.68-3.78-1.32-3.78-1.32-.51-1.3-1.24-1.64-1.24-1.64-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 1.72 2.63 1.22 3.27.93.1-.73.39-1.22.71-1.5-2.49-.29-5.1-1.25-5.1-5.54 0-1.22.43-2.22 1.15-3-.12-.28-.5-1.42.11-2.96 0 0 .94-.3 3.08 1.15a10.7 10.7 0 0 1 5.6 0c2.14-1.45 3.08-1.15 3.08-1.15.61 1.54.23 2.68.11 2.96.72.78 1.15 1.78 1.15 3 0 4.3-2.62 5.25-5.12 5.53.4.35.76 1.03.76 2.08v3.08c0 .3.2.65.77.54A11.2 11.2 0 0 0 12 .8Z"/></svg><span class="link-tooltip" aria-hidden="true">GitHub source</span></a>
+        <a class="nv-link" href="https://nickvuci.com/" target="_blank" rel="noopener noreferrer" aria-label="Nick Vuci (opens in a new tab)" title="Nick Vuci"><img class="nv-logo" src="assets/nv-mark.svg" width="54" height="22" alt="" aria-hidden="true"><span class="link-tooltip" aria-hidden="true">Nick Vuci</span></a>
+      </div>
+    </section>
+    <nav id="communityLinks" class="panel corner corner-links" aria-label="Xen community links">
+      <div class="community-icons xen-links">
+        <a href="https://en.xen.wiki/w/Main_Page" target="_blank" rel="noopener noreferrer" aria-label="Xenharmonic Wiki (opens in a new tab)" title="Xenharmonic Wiki"><img class="xen-icon" src="assets/xen-wiki.png" width="40" height="40" alt="" aria-hidden="true"><span class="link-tooltip" aria-hidden="true">Xenharmonic Wiki</span></a>
+        <a href="https://discord.com/invite/QhJBn3b2wX" target="_blank" rel="noopener noreferrer" aria-label="XA Discord (opens in a new tab)" title="XA Discord"><svg class="xa-icon" viewBox="0 0 32 32" aria-hidden="true"><use href="assets/xa-discord.svg#icon"/></svg><span class="link-tooltip" aria-hidden="true">XA Discord</span></a>
+        <a href="https://www.facebook.com/groups/xenharmonic2" target="_blank" rel="noopener noreferrer" aria-label="XA Facebook (opens in a new tab)" title="XA Facebook"><svg class="xa-icon" viewBox="0 0 32 32" aria-hidden="true"><use href="assets/xa-facebook.svg#icon"/></svg><span class="link-tooltip" aria-hidden="true">XA Facebook</span></a>
+      </div>
+      <a class="diamond-return" href="https://en.xen.wiki/w/Tonality_diamond" target="_blank" rel="noopener noreferrer">go back to the tonality diamond page</a>
+    </nav>
+    <p id="notice" class="notice" role="status" hidden></p>
   </div>
-<script type="module" src="js/index.js"></script>
+  <dialog id="shareDialog" aria-labelledby="shareTitle">
+    <h2 id="shareTitle">Setup link</h2><p>Copy this link to reopen the current diamond and sound settings.</p>
+    <label for="shareURL">Link</label><textarea id="shareURL" rows="5" readonly></textarea>
+    <button id="closeShare" class="btn">Close</button>
+  </dialog>
+  <noscript>Enable JavaScript to use the tonality diamond.</noscript>
+  <script type="module" src="js/index.js"></script>
 </body>
 </html>
