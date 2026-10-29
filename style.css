@@ -311,8 +311,8 @@ kbd { font-family: inherit; font-size: 16px; padding: 1px 4px; border: 1px solid
 #settings-help .help-section:first-child { border-top: 0; }
 #playbar.panel { left: 14px; bottom: 10px; transform: none; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
 #playbar .inline { justify-content: flex-start; gap: 16px; }
-#playbar .btn { padding: 3px 0; min-height: 26px; background: transparent; color: #444; border: 0; border-radius: 0; box-shadow: none; font-size: 16px; font-weight: 400; }
-#playbar .btn:hover, #playbar .btn[aria-pressed="true"] { color: #111; text-decoration: underline; text-underline-offset: 3px; }
+#playbar .btn, #menu .octave-toggle { padding: 3px 0; min-height: 26px; background: transparent; color: #444; border: 0; border-radius: 0; box-shadow: none; font-size: 16px; font-weight: 400; }
+#playbar .btn:hover, #playbar .btn[aria-pressed="true"], #menu .octave-toggle:hover, #menu .octave-toggle[aria-pressed="true"] { color: #111; text-decoration: underline; text-underline-offset: 3px; }
 #playbar #panic { color: #922; }
 @media (max-width: 600px) {
   #playbar.panel { left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); }
@@ -416,7 +416,6 @@ kbd { font-family: inherit; font-size: 16px; padding: 1px 4px; border: 1px solid
 .compact-presets, .compact-label { display: none; }
 .quick-actions { display: flex; align-items: center; gap: 12px; }
 .octave-toggle { min-height: 32px; }
-.octave-toggle[aria-pressed="true"] { box-shadow: inset 0 -2px currentColor; }
 
 /* A phone keeps the same four groups, using native pickers instead of wrapped preset rows. */
 @media (max-width: 700px) {
@@ -482,8 +481,8 @@ kbd { font-family: inherit; font-size: 16px; padding: 1px 4px; border: 1px solid
 :root[data-theme="dark"] { color-scheme: dark; --bg: #171a20; --ink: #e6e8ed; --panel-border: #4c5564; }
 [data-theme="dark"] #viewport { background: var(--bg); }
 [data-theme="dark"] :is(#menuContent, .corner-popup, dialog, .menu-tabs, .menu-footer, .link-tooltip, #audioBanner) { background: #232831; color: #e6e8ed; border-color: #4c5564; }
-[data-theme="dark"] :is(#quickControls .btn, #menu button.advanced-toggle, .corner-toggle, #playbar .btn, .quick-volume, .quick-volume output, .text-button, .menu-tabs button, .segmented span, .envelope summary, .muted, .menu-body .muted, .help-section p, .shortcut-list div, .shortcut-list dd, #zoomPct, output, .root-frequency, #audioBanner .msg) { color: #c4cbd5; }
-[data-theme="dark"] :is(#quickControls .btn[aria-pressed="true"], #quickControls .btn:hover, #menu button.advanced-toggle:hover, .corner-toggle:hover, #playbar .btn:hover, #playbar .btn[aria-pressed="true"], .text-button:hover, .setting-block h3, .help-section h3) { color: #fff; }
+[data-theme="dark"] :is(#quickControls .btn, #menu .octave-toggle, #menu button.advanced-toggle, .corner-toggle, #playbar .btn, .quick-volume, .quick-volume output, .text-button, .menu-tabs button, .segmented span, .envelope summary, .muted, .menu-body .muted, .help-section p, .shortcut-list div, .shortcut-list dd, #zoomPct, output, .root-frequency, #audioBanner .msg) { color: #c4cbd5; }
+[data-theme="dark"] :is(#quickControls .btn[aria-pressed="true"], #quickControls .btn:hover, #menu .octave-toggle:hover, #menu .octave-toggle[aria-pressed="true"], #menu button.advanced-toggle:hover, .corner-toggle:hover, #playbar .btn:hover, #playbar .btn[aria-pressed="true"], .text-button:hover, .setting-block h3, .help-section h3) { color: #fff; }
 [data-theme="dark"] :is(.menu-body label:not(.check-row):not(.segmented label), .menu-body .check-row) { color: #d9dee6; }
 [data-theme="dark"] :is(.menu-body input[type="number"], .menu-body input[type="text"], .menu-body select, dialog textarea, .segmented, kbd) { background: #181c23; border-color: #505b6c; color: #e6e8ed; }
 [data-theme="dark"] :is(.setting-block, .help-section, .menu-tabs, .menu-footer) { border-color: #3b4452; }
