@@ -23,7 +23,10 @@
         <select id="limitPreset" aria-label="Odd limit preset"></select>
         <select id="layoutPreset" aria-label="Layout preset"></select>
       </div>
+      <div class="quick-actions">
+      <button id="octaveReduced" type="button" class="btn ghost small octave-toggle" aria-pressed="false">Octave reduced</button>
       <button id="menuToggle" class="panel-header advanced-toggle" aria-label="Custom" aria-expanded="false" aria-controls="menuContent"><span>Custom</span><span class="btn-collapse" aria-hidden="true">+</span></button>
+      </div>
       <div id="menuContent" class="corner-popup" hidden>
         <div class="menu-tabs" role="tablist" aria-label="Control categories">
           <button id="tab-diamond" role="tab" aria-selected="true" aria-controls="settings-diamond" tabindex="0">Diamond</button>
@@ -52,8 +55,7 @@
                 <label><input type="radio" name="labels" value="source" checked><span>Rows (a/b)</span></label>
                 <label><input type="radio" name="labels" value="pitch"><span>Sounding ratio</span></label>
               </div>
-              <label class="check-row"><input id="folded" type="checkbox" aria-describedby="octaveHint"><span>Reduce pitches to one octave</span></label>
-              <p id="octaveHint" class="muted" role="status"></p>
+              <label class="check-row"><input id="folded" type="checkbox"><span>Reduce pitches to one octave</span></label>
             </section>
           </div>
           <div id="settings-view" role="tabpanel" aria-labelledby="tab-view" hidden>

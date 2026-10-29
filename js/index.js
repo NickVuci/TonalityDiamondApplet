@@ -73,10 +73,7 @@ function syncFields() {
   $('limitPreset').value = preset ? String(config.limit) : 'custom';
   syncRootField();
   $('folded').checked = config.folded;
-  $('octaveHint').textContent = (config.folded
-    ? 'Pitches reduced to ' + config.root.toFixed(2) + '–' + (config.root * 2).toFixed(2) + ' Hz (upper bound excluded).'
-    : 'Pitches use their original register.')
-    + (config.labels === 'source' ? ' Row labels stay a/b; choose Sounding ratio to see the pitches you hear.' : ' Labels show the pitches you hear.');
+  $('octaveReduced').setAttribute('aria-pressed', String(config.folded));
   $('volumeValue').textContent = Math.round(config.volume * 100) + '%';
   $('tempoValue').textContent = config.tempo + ' BPM';
   $('tempoControl').hidden = config.axisMode !== 'arpeggio';
@@ -131,6 +128,10 @@ function applyShape(event) {
 $('shapeForm').addEventListener('submit', applyShape);
 for (const id of ['oddLimit', 'primeLimit', 'customNums']) $(id).addEventListener('change', applyShape);
 $('folded').addEventListener('change', () => update({ folded: $('folded').checked }));
+$('octaveReduced').addEventListener('click', () => {
+  const folded = !config.folded;
+  update({ folded, labels: folded ? 'pitch' : 'source' });
+});
 document.querySelectorAll('input[name="labels"]').forEach(r => r.addEventListener('change', () => update({ labels: r.value })));
 document.querySelectorAll('input[name="orient"]').forEach(r => r.addEventListener('change', () => {
   config.orientation = r.value; view.vertical = r.value === 'vertical'; view.transform(); persist();
