@@ -167,23 +167,33 @@ export class DiamondView {
     const size = (this.count - 1) * STRIDE + NOTE_SIZE;
     // Fit the chord strips too, while keeping the active square's centre fixed.
     const footprint = size + AXIS_THICKNESS + AXIS_GAP - AXIS_INSET;
-    const left = 12, right = this.viewport.clientWidth - 12;
-    const top = 12, bottom = this.viewport.clientHeight - 12;
+    const insets = getComputedStyle(this.viewport);
+    // getBoundingClientRect includes browser/CSS zoom; layout dimensions do not.
+    const viewportBox = this.viewport.getBoundingClientRect();
+    const scaleX = viewportBox.width / this.viewport.clientWidth, scaleY = viewportBox.height / this.viewport.clientHeight;
+    const layoutBounds = node => {
+      const box = node.getBoundingClientRect();
+      return { left: (box.left - viewportBox.left) / scaleX, right: (box.right - viewportBox.left) / scaleX,
+        top: (box.top - viewportBox.top) / scaleY, bottom: (box.bottom - viewportBox.top) / scaleY };
+    };
+    const safe = { top: parseFloat(insets.paddingTop), right: parseFloat(insets.paddingRight), bottom: parseFloat(insets.paddingBottom), left: parseFloat(insets.paddingLeft) };
+    const left = Math.max(12, safe.left), right = this.viewport.clientWidth - Math.max(12, safe.right);
+    const top = Math.max(12, safe.top), bottom = this.viewport.clientHeight - Math.max(12, safe.bottom);
     let availableScale = Math.min(right - left, bottom - top) / (footprint * Math.SQRT2);
     const centreX = (left + right) / 2, centreY = (top + bottom) / 2;
     // Keep enlarged corner controls clear of the instrument, including its chord strips.
     const reach = (size + 2 * (AXIS_THICKNESS + AXIS_GAP)) / Math.SQRT2;
     for (const control of this.controls) {
-      const bounds = control.getBoundingClientRect();
+      const bounds = layoutBounds(control);
       const popup = control.querySelector(':scope > .corner-popup');
       if (popup) {
-        const room = control.id !== 'helpMenu' ? this.viewport.clientHeight - bounds.bottom : bounds.top;
-        popup.style.maxHeight = Math.max(32, room - 18) + 'px';
+        const room = control.id !== 'helpMenu' ? this.viewport.clientHeight - safe.bottom - bounds.bottom : bounds.top - safe.top;
+        popup.style.maxHeight = Math.max(32, room - 6) + 'px';
       }
       const targets = control.querySelectorAll('button, input, select, a, label, .quick-heading, output');
       for (const target of targets) {
         if (target.closest('.corner-popup') || !target.getClientRects().length) continue;
-        const box = target.getBoundingClientRect();
+        const box = layoutBounds(target);
         const dx = Math.max(box.left - centreX, centreX - box.right, 0);
         const dy = Math.max(box.top - centreY, centreY - box.bottom, 0);
         availableScale = Math.min(availableScale, Math.max(1, dx + dy - 12) / reach);

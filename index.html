@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Exploring Tonality Diamonds</title>
 <link rel="icon" href="data:,">
 <script src="js/theme.js"></script>
@@ -19,7 +19,11 @@
           <button type="button" class="btn ghost small" data-layout="chordal" aria-pressed="false" title="Diamond Marimba: 1, 5, 3, 7, 9, 11">Chordally</button>
         </div>
       </div>
-      <button id="menuToggle" class="panel-header advanced-toggle" aria-expanded="false" aria-controls="menuContent"><span>Advanced diamond options</span><span class="btn-collapse" aria-hidden="true">+</span></button>
+      <div class="compact-presets">
+        <select id="limitPreset" aria-label="Odd limit preset"></select>
+        <select id="layoutPreset" aria-label="Layout preset"></select>
+      </div>
+      <button id="menuToggle" class="panel-header advanced-toggle" aria-label="Custom" aria-expanded="false" aria-controls="menuContent"><span>Custom</span><span class="btn-collapse" aria-hidden="true">+</span></button>
       <div id="menuContent" class="corner-popup" hidden>
         <div class="menu-tabs" role="tablist" aria-label="Control categories">
           <button id="tab-diamond" role="tab" aria-selected="true" aria-controls="settings-diamond" tabindex="0">Diamond</button>
@@ -81,14 +85,14 @@
     <section id="playbar" class="panel corner" aria-label="Sound controls">
       <div class="sound-primary">
       <div class="quick-volume"><label for="volume">Volume</label><input type="range" id="volume" min="0" max="1" step="0.01" value="0.18"><output id="volumeValue" for="volume">18%</output></div>
-        <button id="panic" class="btn danger">Stop all</button>
       </div>
       <div class="inline">
         <button id="sustain" class="btn secondary" aria-pressed="false">Sustain</button>
-        <button id="explore" class="btn secondary">Play scale</button>
+        <button id="explore" class="btn secondary" aria-label="Play scale"><span class="wide-label">Play scale</span><span class="compact-label" aria-hidden="true">Play scale</span></button>
         <label class="root-frequency" title="Root frequency — click to edit"><input type="number" id="refHz" aria-label="Root frequency in hertz" min="20" max="2000" step="any" value="392.00" required><span>Hz</span></label>
+        <button id="panic" class="btn danger">Stop all</button>
       </div>
-      <button id="soundToggle" class="corner-toggle" aria-expanded="false" aria-controls="soundContent"><span>Advanced sound options</span><span class="btn-collapse" aria-hidden="true">+</span></button>
+      <button id="soundToggle" class="corner-toggle" aria-label="Advanced sound options" aria-expanded="false" aria-controls="soundContent"><span class="wide-label">Advanced sound options</span><span class="compact-label" aria-hidden="true">Options</span><span class="btn-collapse" aria-hidden="true">+</span></button>
       <div id="soundContent" class="corner-popup menu-body" hidden>
           <div id="settings-sound">
             <section class="setting-block">

@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 test('presets, bounded custom input, independent labels, and saved settings', async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('button', { name: '11-limit preset' }).click();
   await expect(page.locator('.note')).toHaveCount(36);
   await page.getByRole('radio', { name: 'Custom', exact: true }).check();
@@ -22,7 +22,7 @@ test('presets, bounded custom input, independent labels, and saved settings', as
   expect(await page.locator('.note').evaluateAll(nodes => nodes.map(n => n.dataset.note))).toEqual(before);
   await page.reload();
   await expect(page.locator('.note')).toHaveCount(16);
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Sounding ratio' })).toBeChecked();
   expect(errors).toEqual([]);
 });
@@ -32,10 +32,10 @@ test('sustain toggles, grid replacement releases voices, and Escape cancels sequ
   await note.click(); await expect(note).toHaveClass(/play/);
   await note.click(); await expect(page.locator('.note.play')).toHaveCount(0);
   await note.click();
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('button', { name: '7-limit preset' }).click();
   await expect(page.locator('.note.play')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('button', { name: 'Play scale', exact: true }).click();
   await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
@@ -62,7 +62,7 @@ test('edge chords, arpeggios, and keyboard tile activation work', async ({ page 
   await expect(page.locator('.note.play')).toHaveCount(0);
 });
 test('editing a field does not rotate the diamond and invalid links recover', async ({ page }) => {
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('radio', { name: 'Custom', exact: true }).check();
   await page.getByLabel('Numbers (any order)').press('o');
   await expect(page.locator('#diamondWrap')).toHaveCSS('--label-rot', '45deg');
@@ -88,20 +88,20 @@ test('phone touch drag, two fingers, panel scrolling, and default dark canvas', 
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(first, 1), point(second, 2)] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => page.locator('.note.play').evaluateAll(nodes => new Set(nodes.map(n => n.dataset.note)).size)).toBe(2);
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).tap();
+  await page.getByRole('button', { name: 'Custom', exact: true }).tap();
   await expect(page.getByLabel('Odd limit', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Help', exact: true }).tap();
   await expect(page.locator('#settings-help')).toBeVisible();
   await page.getByRole('button', { name: 'Help', exact: true }).tap();
   await expect(page.locator('#menuContent')).toBeHidden();
-  await expect(page.locator('#quickControls')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Odd limit preset', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await context.close();
 });
 
 test('move mode, fit, reset, and Shift sustain leave no stuck interaction state', async ({ page }) => {
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByRole('tab', { name: 'View', exact: true }).click();
   await page.getByLabel('Move / pinch to zoom').check();
   await page.getByRole('button', { name: 'Zoom in' }).click();
@@ -110,7 +110,7 @@ test('move mode, fit, reset, and Shift sustain leave no stuck interaction state'
   await expect(page.locator('#zoomPct')).toHaveText('100%');
   await page.getByRole('button', { name: 'Reset settings', exact: true }).click();
   await expect(page.getByLabel('Move / pinch to zoom')).not.toBeChecked();
-  await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.keyboard.down('Shift');
   await page.getByRole('button', { name: 'Play row 3', exact: true }).click({ modifiers: ['Shift'] });
   await expect.poll(() => page.locator('.note.play').evaluateAll(nodes => new Set(nodes.map(n => n.dataset.note)).size)).toBe(3);
@@ -142,7 +142,7 @@ test('diamond cells share exact edges without overlaps, gaps, or added pressed b
   expect(await tile.evaluate(node => getComputedStyle(node, '::after').pointerEvents)).toBe('none');
 });
 test('diamond tabs and separate sound/help disclosures support keyboard navigation', async ({ page }) => {
-  const diamond = page.getByRole('button', { name: 'Advanced diamond options', exact: true });
+  const diamond = page.getByRole('button', { name: 'Custom', exact: true });
   const sound = page.getByRole('button', { name: 'Advanced sound options', exact: true });
   const help = page.getByRole('button', { name: 'Help', exact: true });
   await diamond.click();
@@ -206,9 +206,9 @@ test('compact corner controls leave the diamond fitted to the full viewport', as
     await expect(page.locator('#menu')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(page.locator('#menu')).toHaveCSS('box-shadow', 'none');
     expect((await page.locator('#menu').boundingBox()).height).toBeLessThan(viewport.width < 801 ? 260 : 130);
-    await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+    await page.getByRole('button', { name: 'Custom', exact: true }).click();
     expect(await board.boundingBox()).toEqual(before);
-    await page.getByRole('button', { name: 'Advanced diamond options', exact: true }).click();
+    await page.getByRole('button', { name: 'Custom', exact: true }).click();
   }
 });
 
@@ -320,13 +320,21 @@ test('playable diamond stays centred with thin connected chord strips', async ({
 });
 
 test('fixed corner dropdowns stay within narrow viewports', async ({page}) => {
-  for (const viewport of [{width:1200,height:800},{width:390,height:844},{width:320,height:568}]) {
+  for (const viewport of [{width:1200,height:800},{width:390,height:844},{width:320,height:568},{width:568,height:320},{width:844,height:390}]) {
     await page.setViewportSize(viewport);
-    for (const [label,id] of [['Advanced diamond options','menuContent'],['Advanced sound options','soundContent'],['Help','helpContent']]) {
+    for (const [label,id] of [['Custom','menuContent'],['Advanced sound options','soundContent'],['Help','helpContent']]) {
       await page.getByRole('button',{name:label,exact:true}).click();
-      const box=await page.locator('#'+id).boundingBox();
+      const popup=page.locator('#'+id);
+      const box=await popup.boundingBox();
       expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.x+box.width).toBeLessThanOrEqual(viewport.width);expect(box.y+box.height).toBeLessThanOrEqual(viewport.height);
+      const covered=await popup.evaluate(root=>[...root.querySelectorAll('button,input,select,summary')].filter(node=>{
+        const r=node.getBoundingClientRect(),p=root.getBoundingClientRect();
+        if(!node.getClientRects().length || r.y+r.height/2<p.top || r.y+r.height/2>p.bottom) return false;
+        const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+        return hit?.closest('.panel') !== root.closest('.panel');
+      }).map(node=>node.id));
+      expect(covered).toEqual([]);
       await page.keyboard.press('Escape');
     }
   }
@@ -502,7 +510,7 @@ test('dark appearance persists independently, retains readable controls, and loa
   expect(await wiki.evaluate(img=>img.complete&&img.naturalWidth===180)).toBe(true);
   await page.reload();
   await expect(toggle).toHaveAccessibleName('Switch to light mode');
-  for(const [label,id] of [['Advanced diamond options','menuContent'],['Advanced sound options','soundContent'],['Help','helpContent']]) {
+  for(const [label,id] of [['Custom','menuContent'],['Advanced sound options','soundContent'],['Help','helpContent']]) {
     await page.getByRole('button',{name:label,exact:true}).click();
     await expect(page.locator('#'+id)).toHaveCSS('background-color','rgb(35, 40, 49)');
     await page.keyboard.press('Escape');
@@ -572,5 +580,97 @@ test('painted colours stop at the divider and chord-strip edges stay straight', 
         await page.keyboard.press('o');
       }
     }
+  }
+});
+
+
+test('responsive corners keep controls separate through portrait, landscape and playback', async ({page}) => {
+  for (const viewport of [{width:320,height:568},{width:360,height:640},{width:390,height:844},{width:568,height:320},{width:640,height:280},{width:700,height:500},{width:701,height:500},{width:844,height:390},{width:1024,height:768},{width:1440,height:900}]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(async()=>{const r=await page.locator('#diamondWrap').boundingBox();return Math.round(r.y+r.height/2);}).toBe(viewport.height/2);
+    for (const active of [false,true]) {
+      if (active) await page.getByRole('button', {name:'Play scale',exact:true}).click();
+      const issues = await page.evaluate(() => {
+        const selector = '#presets button,#layoutPresets button,#limitPreset,#layoutPreset,#menuToggle,#volume,#volumeValue,#panic,#sustain,#explore,#refHz,.root-frequency>span,#soundToggle,#helpToggle,#themeToggle,#helpMenu a,#communityLinks a';
+        const items=[...document.querySelectorAll(selector)].filter(n=>n.getClientRects().length).map(n=>({n,r:n.getBoundingClientRect(),name:n.id||n.getAttribute('aria-label')||n.textContent}));
+        const errors=[];
+        for (let i=0;i<items.length;i++) {
+          const {n,r,name}=items[i];
+          if(r.left<0||r.top<0||r.right>innerWidth+0.5||r.bottom>innerHeight+0.5) errors.push(name+' leaves viewport');
+          const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+          if(!n.contains(hit)) errors.push(name+' is covered');
+          if(n.tagName==='BUTTON' && n.textContent.trim() && r.height>40) errors.push(name+' wraps');
+          for (const other of items.slice(i+1)) {
+            const b=other.r;
+            if(Math.min(r.right,b.right)-Math.max(r.left,b.left)>0.5 && Math.min(r.bottom,b.bottom)-Math.max(r.top,b.top)>0.5) errors.push(name+' overlaps '+other.name);
+          }
+        }
+        return errors;
+      });
+      expect(issues, JSON.stringify({viewport,active})).toEqual([]);
+      if (active) await page.getByRole('button', {name:'Stop all',exact:true}).click();
+    }
+    for (const label of ['Custom','Advanced sound options','Help']) {
+      const toggle=page.getByRole('button',{name:label,exact:true});
+      await toggle.click();
+      const popup=page.locator('#'+await toggle.getAttribute('aria-controls'));
+      const box=await popup.boundingBox();
+      expect(box.x).toBeGreaterThanOrEqual(0);expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x+box.width).toBeLessThanOrEqual(viewport.width);
+      expect(box.y+box.height).toBeLessThanOrEqual(viewport.height);
+      await page.keyboard.press('Escape');
+    }
+  }
+});
+
+test('compact presets share state with desktop buttons, custom settings and saved links', async ({page}) => {
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.setViewportSize({width:390,height:844});
+  const limit=page.getByRole('combobox',{name:'Odd limit preset',exact:true});
+  const layout=page.getByRole('combobox',{name:'Layout preset',exact:true});
+  for (const value of ['5','7','11','13','15']) {
+    await limit.selectOption(value);
+    await expect(page.locator('.note')).toHaveCount(((+value+1)/2)**2);
+  }
+  await limit.selectOption('11');
+  await layout.selectOption('tonal');
+  expect(await page.locator('.axis[data-axis="column"]').evaluateAll(nodes=>nodes.map(n=>+n.dataset.value))).toEqual([1,9,5,11,3,7]);
+  await page.reload();
+  await expect(limit).toHaveValue('11');await expect(layout).toHaveValue('tonal');
+  await page.setViewportSize({width:1200,height:800});
+  await expect(page.getByRole('button',{name:'11-limit preset',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('button',{name:'Tonally',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'13-limit preset',exact:true}).click();
+  await page.getByRole('button',{name:'Chordally',exact:true}).click();
+  await page.setViewportSize({width:320,height:568});
+  await expect(limit).toHaveValue('13');await expect(layout).toHaveValue('chordal');
+  await page.getByRole('button',{name:'Custom',exact:true}).click();
+  await page.getByRole('radio',{name:'Custom',exact:true}).check();
+  await page.getByLabel('Numbers (any order)').fill('4.5.6.7');
+  await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(limit).toHaveValue('custom');
+  await expect(page.locator('.note')).toHaveCount(16);
+  await limit.selectOption('5');
+  await expect(page.locator('.note')).toHaveCount(9);
+  expect(errors).toEqual([]);
+});
+
+
+test('corner anchors and dropdowns respect phone safe areas', async ({page}) => {
+  for (const viewport of [{width:390,height:844},{width:844,height:390}]) {
+    await page.setViewportSize(viewport);
+    await page.addStyleTag({content:'#viewport { --corner-top: 44px; --corner-bottom: 34px; --corner-left: 44px; --corner-right: 44px; }'});
+    await expect.poll(()=>page.locator('#helpMenu').evaluate(node=>Math.round(node.getBoundingClientRect().bottom))).toBe(viewport.height-34);
+    for (const label of ['Custom','Advanced sound options','Help']) {
+      const toggle=page.getByRole('button',{name:label,exact:true});
+      await toggle.click();
+      const box=await page.locator('#'+await toggle.getAttribute('aria-controls')).boundingBox();
+      expect(box.x).toBeGreaterThanOrEqual(44);expect(box.y).toBeGreaterThanOrEqual(44);
+      expect(box.x+box.width).toBeLessThanOrEqual(viewport.width-44);
+      expect(box.y+box.height).toBeLessThanOrEqual(viewport.height-34);
+      await page.keyboard.press('Escape');
+    }
+    await page.reload();
   }
 });

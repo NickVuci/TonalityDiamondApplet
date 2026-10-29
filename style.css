@@ -347,16 +347,7 @@ kbd { font-family: inherit; font-size: 16px; padding: 1px 4px; border: 1px solid
 :is(#communityLinks, #helpMenu) a:focus-visible { outline: 1px solid currentColor; outline-offset: 1px; }
 .link-tooltip { position: absolute; right: 0; bottom: calc(100% + 5px); visibility: hidden; opacity: 0; padding: 4px 6px; border: 1px solid #ddd; background: #fff; white-space: nowrap; color: #444; font-size: 16px; pointer-events: none; }
 :is(#communityLinks, #helpMenu) a:hover .link-tooltip, :is(#communityLinks, #helpMenu) a:focus-visible .link-tooltip { visibility: visible; opacity: 1; }
-@media (max-width: 600px) {
-  #helpMenu { top: 10px; right: 10px; }
-  #communityLinks { right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); max-width: calc(100vw - 195px); }
-  :is(#communityLinks, #helpMenu) a { width: 46px; }
-  :is(#communityLinks, #helpMenu) .nv-link { width: 60px; }
-  .community-icons { gap: 6px; }
-  #playbar.panel { width: 170px; }
-  .quick-volume input { width: 80px; }
-  .corner-popup { max-width: calc(100vw - 20px); }
-}
+
 
 /* The root remains a quiet text-like control, independent of the played note. */
 .root-frequency { display: flex; align-items: baseline; gap: 3px; width: max-content; min-height: 18px; color: #52657f; font-size: 16px; font-variant-numeric: tabular-nums; cursor: text; }
@@ -370,93 +361,98 @@ kbd { font-family: inherit; font-size: 16px; padding: 1px 4px; border: 1px solid
 .tile.axis[data-axis="row"] { width: var(--axis-thickness); height: var(--axis-length); }
 .tile.axis .label { font-size: 8px; line-height: 1; }
 
-@media (max-width: 370px) {
-  #communityLinks { max-width: 144px; }
-  .community-icons { gap: 3px; }
-  #playbar.panel { width: 145px; }
-  #playbar .inline { gap: 7px; }
-  .quick-volume input { width: 60px; }
-}
 
-/* Fixed corner positions and inward-opening dropdowns. */
-#viewport { --corner-x: 14px; --corner-top: 14px; --corner-bottom: max(10px, env(safe-area-inset-bottom)); }
+
+/* Stable corner anchors, including phone notches and browser safe areas. */
+#viewport {
+  --corner-left: max(10px, env(safe-area-inset-left));
+  --corner-right: max(10px, env(safe-area-inset-right));
+  --corner-top: max(10px, env(safe-area-inset-top));
+  --corner-bottom: max(10px, env(safe-area-inset-bottom));
+  --ui-size: 16px;
+  padding: var(--corner-top) var(--corner-right) var(--corner-bottom) var(--corner-left);
+}
+#viewport > .panel:has(> .corner-popup:not([hidden])) { z-index: 60; }
 #viewport > .panel { top: auto; right: auto; bottom: auto; left: auto; }
 #viewport > :is(#menu, #playbar) { top: var(--corner-top); }
 #viewport > :is(#helpMenu, #communityLinks) { bottom: var(--corner-bottom); }
-#viewport > :is(#menu, #communityLinks) { left: var(--corner-x); }
-#viewport > :is(#playbar, #helpMenu) { right: var(--corner-x); }
+#viewport > :is(#menu, #communityLinks) { left: var(--corner-left); }
+#viewport > :is(#playbar, #helpMenu) { right: var(--corner-right); }
 #menu > .corner-popup, #playbar > .corner-popup { top: calc(100% + 6px); bottom: auto; }
 #helpMenu > .corner-popup { bottom: calc(100% + 6px); top: auto; }
 #menu > .corner-popup { left: 0; right: auto; }
 #playbar > .corner-popup, #helpMenu > .corner-popup { right: 0; left: auto; }
-#communityLinks { align-items: flex-start; }
+#communityLinks { align-items: flex-start; width: max-content; max-width: calc(100% - var(--corner-left) - var(--corner-right) - 76px); }
 #communityLinks .diamond-return { text-align: left; }
 #communityLinks .link-tooltip { left: 0; right: auto; }
-#menu { width: max-content; }
+#menu.panel, #menu.panel.collapsed { width: max-content; max-width: none; }
 #playbar { display: flex; flex-direction: column; align-items: flex-end; }
 #helpMenu { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 #helpMenu .project-links { flex-direction: column; align-items: center; gap: 5px; }
-@media (max-width: 600px) {
-  #viewport { --corner-x: 10px; --corner-top: 10px; }
-}
-
-/* Uniform readable interface type, with wrapping instead of tiny labels. */
-#viewport { --ui-size: 16px; }
 .panel, .notice, #audioBanner, dialog { font-size: var(--ui-size, 16px); }
-#quickControls { grid-template-columns: 72px 1fr; column-gap: 8px; row-gap: 2px; }
-.quick-heading, .quick-heading .muted { line-height: 1.35; }
-#quickControls .btn { min-height: 30px; line-height: 1.35; }
-.preset-options, .layout-options { flex-wrap: wrap; column-gap: 12px; row-gap: 0; }
-#menu button.advanced-toggle, .corner-toggle { min-height: 32px; line-height: 1.35; gap: 7px; }
+#quickControls { grid-template-columns: 1fr; row-gap: 2px; }
+#quickControls .btn { min-height: 30px; line-height: 1.35; white-space: nowrap; }
+.preset-options, .layout-options { flex-wrap: nowrap; column-gap: 12px; }
+#menu button.advanced-toggle, .corner-toggle { min-height: 32px; line-height: 1.35; gap: 7px; white-space: nowrap; }
 #menu .advanced-toggle .btn-collapse, .corner-toggle .btn-collapse { width: 16px; height: 20px; }
-#playbar.panel { width: 248px; }
-#playbar .inline { flex-wrap: wrap; gap: 0 14px; white-space: normal; }
-#playbar .btn { min-height: 32px; line-height: 1.35; }
-.quick-volume { height: auto; min-height: 32px; flex-wrap: wrap; }
-.quick-volume output { width: 38px; }
-.root-frequency { min-height: 28px; line-height: 1.35; gap: 4px; }
-#menuContent, .corner-popup { width: 340px; }
+#playbar.panel { width: 352px; }
+#playbar .inline { flex-wrap: nowrap; gap: 12px; justify-content: flex-end; white-space: nowrap; }
+#playbar .btn { min-height: 32px; line-height: 1.35; white-space: nowrap; }
+.quick-volume { height: auto; min-height: 32px; flex-wrap: nowrap; }
+.quick-volume output { flex-shrink: 0; width: 4ch; font-variant-numeric: tabular-nums; }
+.quick-volume input { flex: 1; min-width: 0; width: 100%; }
+.root-frequency { min-height: 28px; line-height: 1.35; gap: 4px; flex-shrink: 0; }
+#playbar .inline .root-frequency { min-height: auto; margin: 0; }
+.sound-primary { display: flex; align-items: center; gap: 14px; width: 100%; }
+.sound-primary .quick-volume { flex: 1; min-width: 0; }
+#playbar #panic { flex-shrink: 0; }
+#menuContent, .corner-popup { width: 340px; max-width: calc(100vw - var(--corner-left) - var(--corner-right)); overscroll-behavior: contain; touch-action: pan-y; }
 .field-pair { align-items: end; }
 .shape-actions { align-items: flex-start; }
 .menu-footer { flex-wrap: wrap; }
 .shortcut-list div { grid-template-columns: 145px 1fr; }
 .link-tooltip { max-width: min(300px, calc(100vw - 24px)); white-space: normal; width: max-content; line-height: 1.35; }
 #settings-sound > .setting-block > .field-pair:has(#wave) { grid-template-columns: 1fr; }
-@media (max-width: 800px) {
-  #viewport #menu, #viewport #playbar { width: calc(50vw - 22px); max-width: 280px; }
-  #viewport #quickControls { grid-template-columns: 1fr; row-gap: 0; }
-  #viewport .quick-heading { line-height: 1.35; }
-  #viewport .quick-volume input { width: clamp(50px, 10vw, 100px); }
-  #viewport #playbar .inline { gap: 0 10px; }
-  #viewport .layout-options { gap: 0 10px; }
-  #viewport #menu .advanced-toggle { width: 100%; }
-  #playbar .corner-toggle { justify-content: flex-end; }
-}
-@media (max-width: 420px) {
+.compact-presets, .compact-label { display: none; }
+
+/* A phone keeps the same four groups, using native pickers instead of wrapped preset rows. */
+@media (max-width: 700px) {
+  #viewport #menu, #viewport #playbar { width: calc((100% - var(--corner-left) - var(--corner-right) - 16px) / 2); max-width: 240px; }
+  #viewport #menu { width: 120px; }
+  #viewport #playbar { min-width: 164px; }
+  #viewport #quickControls, .wide-label { display: none; }
+  .compact-label { display: inline; }
+  .compact-presets { display: flex; flex-direction: column; align-items: flex-start; }
+  #menu .compact-presets select { pointer-events: auto; width: 120px; max-width: 100%; min-height: 36px; padding: 0 20px 0 0; border: 0; border-radius: 0; background: transparent; color: inherit; font-size: 16px; cursor: pointer; }
+  .compact-presets option { background: var(--bg); color: var(--ink); }
+  #menu button.advanced-toggle, #playbar .btn, #playbar .corner-toggle { min-height: 36px; }
+  .sound-primary { gap: 8px; }
+  .quick-volume { gap: 5px; min-height: 36px; }
+  .quick-volume label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #playbar .inline { display: grid; grid-template-columns: auto auto; column-gap: 10px; row-gap: 0; justify-items: end; }
+  #playbar .root-frequency { grid-column: 1; min-height: 32px; align-items: center; }
+  #refHz { max-width: 8ch; }
+  #communityLinks .diamond-return { max-width: 290px; text-wrap: balance; }
+  .community-icons { gap: 6px; }
   .shortcut-list div { grid-template-columns: 1fr; gap: 4px; }
-  .quick-volume { column-gap: 6px; }
-  #viewport .quick-volume input { width: 60px; }
-  #viewport .quick-volume output { width: 38px; }
-  #viewport #playbar .inline { justify-content: flex-end; }
-  #viewport .preset-options { column-gap: 10px; }
-  #menuContent .menu-footer { gap: 0 12px; }
 }
 
-@media (min-width: 801px) {
-  #menu.panel, #menu.panel.collapsed { width: 336px; }
+/* Short landscape screens need less vertical chrome, keeping the icon order intact. */
+@media (max-height: 500px) {
+  #helpMenu, #helpMenu .project-links { gap: 2px; }
+  #helpMenu :is(#helpToggle, #themeToggle, a) { height: 32px; min-height: 32px; }
+  #helpMenu svg { width: 28px; height: 28px; }
+  #communityLinks .xen-links a { height: 36px; width: 38px; }
+  #communityLinks .xen-icon { width: 30px; height: 30px; transform: translateY(-3.75px); }
+  #communityLinks .xa-icon { width: 36px; height: 36px; }
+  #communityLinks .diamond-return { max-width: 290px; }
 }
 
-/* Compact preset rows and paired sound controls. */
-#viewport #quickControls { grid-template-columns: 1fr; }
-#playbar.panel { width: 290px; }
-.sound-primary { display: flex; align-items: center; gap: 14px; width: 100%; }
-.sound-primary .quick-volume { flex: 1; min-width: 0; }
-#playbar #panic { flex-shrink: 0; white-space: nowrap; }
-#playbar .inline { justify-content: flex-end; }
-#playbar .inline .root-frequency { min-height: auto; margin: 0; }
-@media (max-width: 800px) {
-  .sound-primary { gap: 10px; }
-  #viewport .sound-primary .quick-volume input { max-width: 100%; }
+@media (max-height: 360px) and (max-width: 700px) {
+  #menu .compact-presets select, #menu button.advanced-toggle, #playbar .btn, #playbar .corner-toggle, .quick-volume { min-height: 32px; }
+  #playbar .root-frequency { min-height: 28px; }
+  #helpMenu :is(#helpToggle, #themeToggle, a) { height: 28px; min-height: 28px; }
+  #helpMenu svg { width: 24px; height: 24px; }
 }
 
 /* Shading changes only: joined edges and tile geometry remain untouched. */

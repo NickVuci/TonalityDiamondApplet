@@ -6,6 +6,7 @@ import { uniquePitches } from './modules/math.js';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'tonality-diamond-classic-v2';
+const LIMIT_PRESETS = [5, 7, 11, 13, 15];
 let saved;
 try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* Storage is optional. */ }
 const initial = readConfig(location.search, saved);
@@ -30,7 +31,9 @@ const player = new Player(audio, {
   options: () => ({ wave: config.wave, attack: config.attack, release: config.release }),
   onSequence(active) {
     sequenceRunning = active;
-    $('explore').textContent = active ? 'Stop sequence' : 'Play scale';
+    $('explore').setAttribute('aria-label', active ? 'Stop sequence' : 'Play scale');
+    $('explore').querySelector('.wide-label').textContent = active ? 'Stop sequence' : 'Play scale';
+    $('explore').querySelector('.compact-label').textContent = active ? 'Stop' : 'Play scale';
   }
 });
 
@@ -62,6 +65,12 @@ function syncFields() {
   for (const [name, value] of [['mode', config.mode], ['labels', config.labels], ['orient', config.orientation]]) {
     document.querySelectorAll('input[name="' + name + '"]').forEach(r => { r.checked = r.value === value; });
   }
+  $('layoutPreset').value = config.layout;
+  const preset = config.mode === 'limit' && config.prime === '' && LIMIT_PRESETS.includes(config.limit);
+  const customOption = $('limitPreset').querySelector('[value="custom"]');
+  customOption.hidden = preset;
+  customOption.textContent = config.mode === 'custom' ? 'Custom' : config.limit + '-limit' + (config.prime === '' ? '' : '*');
+  $('limitPreset').value = preset ? String(config.limit) : 'custom';
   syncRootField();
   $('folded').checked = config.folded;
   $('volumeValue').textContent = Math.round(config.volume * 100) + '%';
@@ -94,14 +103,20 @@ function update(patch, rebuild = true) {
     $('shapeError').textContent = error.message; $('shapeError').hidden = false; return false;
   }
 }
-for (const limit of [5, 7, 11, 13, 15]) {
+for (const limit of LIMIT_PRESETS) {
   const button = document.createElement('button');
   button.type = 'button'; button.className = 'btn ghost small'; button.dataset.limit = limit;
   button.textContent = limit + '-limit'; button.setAttribute('aria-label', limit + '-limit preset');
   button.addEventListener('click', () => update({ mode: 'limit', limit, prime: '' }));
   $('presets').append(button);
+  $('limitPreset').add(new Option(button.textContent, String(limit)));
 }
+$('limitPreset').add(new Option('Custom diamond', 'custom'));
+$('limitPreset').querySelector('[value="custom"]').disabled = true;
+$('limitPreset').addEventListener('change', () => update({ mode: 'limit', limit: Number($('limitPreset').value), prime: '' }));
+$('layoutPreset').addEventListener('change', () => update({ layout: $('layoutPreset').value }));
 for (const button of $('layoutPresets').children) {
+  $('layoutPreset').add(new Option(button.textContent, button.dataset.layout));
   button.addEventListener('click', () => update({ layout: button.dataset.layout }));
 }
 document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => update({ mode: r.value })));
