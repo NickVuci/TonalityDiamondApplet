@@ -52,7 +52,8 @@
                 <label><input type="radio" name="labels" value="source" checked><span>Rows (a/b)</span></label>
                 <label><input type="radio" name="labels" value="pitch"><span>Sounding ratio</span></label>
               </div>
-              <label class="check-row"><input id="folded" type="checkbox"><span>Reduce pitches to one octave</span></label>
+              <label class="check-row"><input id="folded" type="checkbox" aria-describedby="octaveHint"><span>Reduce pitches to one octave</span></label>
+              <p id="octaveHint" class="muted" role="status"></p>
             </section>
           </div>
           <div id="settings-view" role="tabpanel" aria-labelledby="tab-view" hidden>

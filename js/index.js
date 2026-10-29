@@ -73,6 +73,10 @@ function syncFields() {
   $('limitPreset').value = preset ? String(config.limit) : 'custom';
   syncRootField();
   $('folded').checked = config.folded;
+  $('octaveHint').textContent = (config.folded
+    ? 'Pitches reduced to ' + config.root.toFixed(2) + '–' + (config.root * 2).toFixed(2) + ' Hz (upper bound excluded).'
+    : 'Pitches use their original register.')
+    + (config.labels === 'source' ? ' Row labels stay a/b; choose Sounding ratio to see the pitches you hear.' : ' Labels show the pitches you hear.');
   $('volumeValue').textContent = Math.round(config.volume * 100) + '%';
   $('tempoValue').textContent = config.tempo + ' BPM';
   $('tempoControl').hidden = config.axisMode !== 'arpeggio';
