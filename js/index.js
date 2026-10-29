@@ -73,6 +73,7 @@ function syncFields() {
   $('limitPreset').value = preset ? String(config.limit) : 'custom';
   syncRootField();
   $('folded').checked = config.folded;
+  $('octaveReduced').setAttribute('aria-pressed', String(config.folded));
   $('volumeValue').textContent = Math.round(config.volume * 100) + '%';
   $('tempoValue').textContent = config.tempo + ' BPM';
   $('tempoControl').hidden = config.axisMode !== 'arpeggio';
@@ -127,6 +128,10 @@ function applyShape(event) {
 $('shapeForm').addEventListener('submit', applyShape);
 for (const id of ['oddLimit', 'primeLimit', 'customNums']) $(id).addEventListener('change', applyShape);
 $('folded').addEventListener('change', () => update({ folded: $('folded').checked }));
+$('octaveReduced').addEventListener('click', () => {
+  const folded = !config.folded;
+  update({ folded, labels: folded ? 'pitch' : 'source' });
+});
 document.querySelectorAll('input[name="labels"]').forEach(r => r.addEventListener('change', () => update({ labels: r.value })));
 document.querySelectorAll('input[name="orient"]').forEach(r => r.addEventListener('change', () => {
   config.orientation = r.value; view.vertical = r.value === 'vertical'; view.transform(); persist();
